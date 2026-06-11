@@ -1,0 +1,13 @@
+# Snowflake workspace metadata
+.snowflake/
+.temp/
+.folder
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.env
