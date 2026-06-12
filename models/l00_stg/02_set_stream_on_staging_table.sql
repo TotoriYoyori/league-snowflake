@@ -10,7 +10,8 @@ USE SCHEMA L00_STG;
     -- 1. SET ONE STREAM ON THE STAGING TABLE FOR DOWNSTREAM TRANSFORMATION
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE STREAM STG_INTERVALS_STRM_RDV 
-ON TABLE STG_INTERVALS;
+ON TABLE STG_INTERVALS
+COMMENT = 'Captures changes on STG_INTERVALS for Raw Data Vault loading';
 
 
 -------------------------------------------------------------------------------------------

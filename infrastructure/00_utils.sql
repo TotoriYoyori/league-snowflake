@@ -32,5 +32,4 @@ AS
       );
       RETURN TABLE(rs);
     END;
-  $$
-;
+  $$;
