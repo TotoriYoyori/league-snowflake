@@ -1,42 +1,37 @@
 -------------------------------------------------------------------------------------------
     -- 0. DECLARE WORKING CONTEXT
+    -- Diagnostic queries to inspect the staging layer of LEAGUE_RECORDS.
+    -- Run each block individually — NOT meant to be executed top-to-bottom.
 -------------------------------------------------------------------------------------------
 USE DATABASE LEAGUE_RECORDS;
-
-USE SCHEMA PUBLIC;
-
-
--------------------------------------------------------------------------------------------
-    -- INSPECT INFRASTRUCTURE PROCEDURES
--------------------------------------------------------------------------------------------
-CALL EXAMINE_DB_SCHEMAS('LEAGUE_RECORDS');
+USE SCHEMA L00_STG;
 
 
 -------------------------------------------------------------------------------------------
-    -- INSPECT STORAGE INTEGRATION
+    -- 1. INSPECT SAMPLE FROM STAGING TABLE
 -------------------------------------------------------------------------------------------
-DESCRIBE STORAGE INTEGRATION LEAGUE_AZINT;
+SELECT *
+FROM LEAGUE_RECORDS.L00_STG.STG_INTERVALS
+ORDER BY RANDOM()
+LIMIT 5;
 
-DESCRIBE NOTIFICATION INTEGRATION LEAGUE_AZNOTI;
-
-
--------------------------------------------------------------------------------------------
-    -- INSPECT FILE FORMAT
--------------------------------------------------------------------------------------------
-SHOW FILE FORMATS IN DATABASE LEAGUE_RECORDS;
-
-DESCRIBE FILE FORMAT LEAGUE_RECORDS.L00_STG. DAILY_MATCH_FMT;
 
 -------------------------------------------------------------------------------------------
-    -- INSPECT STAGE
+    -- 2. INSPECT STAGE'S COPY HISTORY
 -------------------------------------------------------------------------------------------
--- Inspect stage's meta
-SHOW STAGES IN DATABASE LEAGUE_RECORDS;
+CALL EXAMINE_STAGING_HISTORY('STG_INTERVALS', 120);
 
-DESCRIBE STAGE LEAGUE_RECORDS.L00_STG.DAILY_MATCH_AZSTG;
 
--- Inspect first three columns of stage
-SELECT $1, $2, $3
-FROM @LEAGUE_RECORDS.L00_STG.DAILY_MATCH_AZSTG
-    (FILE_FORMAT => 'LEAGUE_RECORDS.L00_STG.DAILY_MATCH_FMT')
-    
+-------------------------------------------------------------------------------------------
+    -- 3. INSPECT PIPE'S STATUS
+-------------------------------------------------------------------------------------------
+SELECT SYSTEM$PIPE_STATUS('LEAGUE_RECORDS.L00_STG.AUTO_LEAGUE_PP');
+
+
+-------------------------------------------------------------------------------------------
+    -- 4. INSPECT STREAM'S STATUS
+-------------------------------------------------------------------------------------------
+SHOW STREAMS IN DATABASE LEAGUE_RECORDS;
+
+SELECT *
+FROM LEAGUE_RECORDS.L00_STG.STG_INTERVALS_STRM_RDV;
