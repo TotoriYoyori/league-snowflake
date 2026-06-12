@@ -2,7 +2,8 @@
     -- 0. DECLARE WORKING CONTEXT
 -------------------------------------------------------------------------------------------
 USE DATABASE LEAGUE_RECORDS;
-USE SCHEMA L00_STG
+
+USE SCHEMA L00_STG;
 
 -------------------------------------------------------------------------------------------
     -- 1. CREATE STORAGE INTEGRATION WITH AZURE BLOB 
@@ -15,7 +16,7 @@ CREATE OR REPLACE STORAGE INTEGRATION LEAGUE_AZINT
     STORAGE_ALLOWED_LOCATIONS = (
         'azure://<storageaccount>.blob.core.windows.net/<container>/<folder>'
     )
-    COMMENT = 'Linking with STORAGE ACCOUNT <storageaccount> ... on CONTAINER <container>'
+    COMMENT = 'Linking with STORAGE ACCOUNT <storageaccount> ... on CONTAINER <container>';
 
 
 -------------------------------------------------------------------------------------------
