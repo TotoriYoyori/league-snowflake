@@ -8,13 +8,12 @@ An ELT pipeline and analytics project built entirely on Snowflake. This data pip
 - Which objective combinations (dragons, barons, heralds) have the strongest impact on game outcome?
 - How do individual player stats (KDA, CS, items) evolve over the course of a match?
 
-## Data Vault (`dv/`)
+## Data Vault
 
-For this project, I practiced a data vault modeling approaches on a single-source `.csv`-based dataset (hub / satellite / link modeling):
-- **Staging** (`l00`): Raw data load and hash key generation
-- **Raw Vault** (`l10`): Append-only hubs for players, teams, and intervals; Links connecting them; Satellites holding descriptive attributes.
-- **Business Vault** (`l20`): Deduplicated, combined views joining hubs, links, and satellites for easier querying
-- **Analytics** (`l30`): Fact and dimension views ready for end users (dashboards, eda, modelling, etc.)
+For this project, I practiced a data vault modeling approach on a single-source `.csv`-based dataset (hub / satellite modeling):
+- **Staging** (`l00_stg`): Raw data landing, hash key generation, and stream-based CDC export
+- **Raw Data Vault** (`l10_rdv`): Append-only hubs and satellites keyed by business keys and hash-diffed for change detection
+- **Information Delivery** (`l20_id`): Star dimensional models and views built from the raw vault for end users (dashboards, EDA, modelling, etc.)
 
 ## Reflection: Why Data Vault?
 
@@ -41,21 +40,29 @@ league-snowflake/
 ├── assets/
 │
 ├── infrastructure/
-│   ├── 01_setup.sql                  -- warehouse, database, schemas
-│   ├── 02_storage_integration.sql    -- Azure stage + file formats
-│   └── 03_ingestion.sql              -- COPY INTO, pipes, streams
+│   ├── 00_examine.sql                 -- diagnostic queries for infra objects
+│   ├── 00_utils.sql                   -- utility functions and procedures
+│   ├── 01_create_db.sql               -- database and schema creation
+│   └── 02_azure_integration.sql       -- Azure storage integration and stage
 │
 ├── models/
-│   ├── staging.sql                   -- hash keys, type casting
-│   ├── raw_vault.sql                 -- hubs, links, satellites
-│   ├── business_vault.sql            -- joined views for querying
-│   └── analytics.sql                 -- fact + dimension views
+│   ├── l00_stg/
+│   │   ├── 00_inspect.sql             -- staging diagnostics
+│   │   ├── 00_utils.sql               -- hash functions (FASTHASH, TRIHASH)
+│   │   ├── 01_stage_pipe.sql          -- staging table and Snowpipe
+│   │   └── 02_set_stream_on_staging_table.sql  -- stream + export view for CDC
+│   │
+│   ├── l10_rdv/
+│   │   ├── 00_inspect.sql             -- raw vault diagnostics
+│   │   ├── 01_hub_satellite_ddl.sql   -- hub and satellite table DDL
+│   │   └── 02_task_to_consume_stream.sql  -- task to MERGE stream into vault
+│   │
+│   └── l20_id/                        -- (planned) information delivery layer
 │
-└── analysis/
-    └── eda.sql                       -- exploratory queries
+└── analysis/                          -- exploratory queries
 ```
 
-Each `models/` file maps to a data vault layer. As the project grows, any file can be split into its own folder (e.g., `models/raw_vault/hubs/`, `models/raw_vault/satellites/`) without changing the overall structure.
+Each `models/` subdirectory maps to a data vault layer and its corresponding Snowflake schema.
 
 ## Stacks Used
 

@@ -14,8 +14,5 @@ CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.L00_STG
 CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.L10_RDV
     COMMENT = 'RAW DATA VAULT: single hub and monolithic satellite per source, keyed and hash-diffed.';
     
-CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.L20_BDV
-    COMMENT = 'BUSINESS DATA VAULT: domain-split satellites (KDA, economy, items, objectives).';
-    
-CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.L30_ID
+CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.L20_ID
     COMMENT = 'INFORMATION DELIVERY: star dimensional models built from the business vault.';
