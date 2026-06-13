@@ -1,0 +1,4 @@
+-- AZURE MODE DEPLOYMENT
+-- 1. 
+
+-- 2. 
