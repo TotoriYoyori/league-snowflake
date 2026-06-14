@@ -11,3 +11,9 @@ Thumbs.db
 __pycache__/
 *.pyc
 .env
+
+# Cache
+analysis/__pycache__/
+
+# Heavy files
+assets/seed/
