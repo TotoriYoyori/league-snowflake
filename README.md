@@ -1,4 +1,4 @@
-![League of Legends banner](assets/league_banner.jpg)
+![League of Legends banner](assets/img/league_banner.jpg)
 
 # League of Legends Match Analytics
 
