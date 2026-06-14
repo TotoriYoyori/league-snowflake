@@ -10,8 +10,8 @@ entities:
     identifier:
       database: LEAGUE_RECORDS
       schema: L30_ID
-      name: KILLS_AT_MINUTE
-    title: kills_at_minute
+      name: PROBABILITY_OF_KDA
+    title: probability_of_kda
     query_warehouse: COMPUTE_WH
     compute_pool: SYSTEM_COMPUTE_POOL_CPU
     run_mode: SpcsOnly

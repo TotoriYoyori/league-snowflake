@@ -5,15 +5,12 @@
 -------------------------------------------------------------------------------------------
 USE WAREHOUSE DV_COMPUTE_WH;
 
--- Pull latest from GitHub before deploying
-ALTER GIT REPOSITORY LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO FETCH;
-
 -------------------------------------------------------------------------------------------
--- INFRASTRUCTURE
+-- SETUP
 -------------------------------------------------------------------------------------------
-EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/infrastructure/00_utils.sql;
-EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/infrastructure/01_create_db.sql;
-EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/infrastructure/02_azure_integration.sql;
+EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/setup/01_create_db.sql;
+EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/setup/02b_demo_stage.sql;
+EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/setup/03_sample_seed.sql;
 
 -------------------------------------------------------------------------------------------
 -- L00_STG - STAGING
