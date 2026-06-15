@@ -76,4 +76,27 @@ CREATE OR REPLACE STAGE DAILY_MATCH_AZSTG
     STORAGE_INTEGRATION = LEAGUE_AZINT
     FILE_FORMAT = DAILY_MATCH_FMT
     COMMENT = 'Staging WITH <storageaccount> on Azure FROM /<container>/<folder>';
+
+
+-------------------------------------------------------------------------------------------
+    -- 5. AUTO-INGEST PIPE (NRT)
+    -- Snowpipe listens to Azure Storage Queue events and triggers COPY INTO automatically.
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE PIPE AUTO_LEAGUE_PP
+COMMENT = 'Auto-ingests league matches from Azure stage via event-driven Snowpipe.'
+AUTO_INGEST = TRUE
+INTEGRATION = 'LEAGUE_AZNOTI'
+AS
+COPY INTO STG_INTERVALS
+FROM (
+    SELECT 
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
+        $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 
+        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, 
+        $31, $32, $33, $34, $35, $36, $37,
+        METADATA$FILENAME,
+        METADATA$FILE_ROW_NUMBER,
+        'League Client Daily Logger'
+    FROM @DAILY_MATCH_AZSTG
+);
     
