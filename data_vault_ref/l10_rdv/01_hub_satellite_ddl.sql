@@ -13,10 +13,11 @@ USE SCHEMA L10_RDV;
 -------------------------------------------------------------------------------------------
 -- Hub
 CREATE OR REPLACE TABLE HUB_INTERVALS (
-    -- Key
+    -- Hash Key
     SHA1_HUB_INTERVAL BINARY NOT NULL,
     -- Business Key
     ID NUMBER NOT NULL,
+    -- Context
     MATCH_ID VARCHAR(255) NOT NULL,
     PLAYER_ID NUMBER NOT NULL,
     MINUTE NUMBER(2,0) NOT NULL,
@@ -26,7 +27,7 @@ CREATE OR REPLACE TABLE HUB_INTERVALS (
     -- Constraint
     CONSTRAINT HUB_INTERVALS_PKEY PRIMARY KEY(SHA1_HUB_INTERVAL)
 )
-COMMENT = '[HUB] Snapshot of individual player statistics every 5 minute per match.';
+COMMENT = '[HUB] Unique interval snapshot keyed by source surrogate ID. Context: match, player, minute.';
 
 -- Satellite
 CREATE OR REPLACE TABLE SAT_INTERVALS (

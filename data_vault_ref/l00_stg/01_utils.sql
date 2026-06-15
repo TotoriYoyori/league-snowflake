@@ -18,19 +18,6 @@ $$
     SHA1_BINARY(UPPER(TRIM(TXT)))
 $$;
 
-CREATE OR REPLACE FUNCTION TRIHASH(STR1 VARCHAR, STR2 VARCHAR, STR3 VARCHAR)
-RETURNS BINARY
-LANGUAGE SQL
-COMMENT = 'Hashes three concatenated strings (joined by "^") into a single SHA1 binary.'
-AS
-$$
-    FASTHASH(ARRAY_TO_STRING(ARRAY_CONSTRUCT(
-        TRIM(STR1),
-        TRIM(STR2),
-        TRIM(STR3)
-    ), '^'))
-$$;
-
 
 -------------------------------------------------------------------------------------------
     -- UTILITY PROCEDURES

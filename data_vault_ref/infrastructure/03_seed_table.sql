@@ -11,8 +11,8 @@ USE SCHEMA L00_STG;
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TABLE SEED_INTERVALS (
     -- Identifier
-  MATCH_ID VARCHAR(255) NOT NULL,
   ID NUMBER(38,0) NOT NULL,
+  MATCH_ID VARCHAR(255) NOT NULL,
   PLAYER_ID NUMBER(38,0) NOT NULL,
     -- Economy
   MINUTE NUMBER(2,0) NOT NULL,
