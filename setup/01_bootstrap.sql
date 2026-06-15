@@ -5,10 +5,10 @@ CREATE WAREHOUSE IF NOT EXISTS DV_COMPUTE_WH
     WAREHOUSE_SIZE = 'XSMALL'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
-    COMMENT = 'Compute warehouse for data vault transformations';
+    COMMENT = 'Compute warehouse for data transformations';
 
 CREATE DATABASE IF NOT EXISTS LEAGUE_RECORDS
-    COMMENT = 'League of Legends match analytics: data vault modeling on in-game interval snapshots.';
+    COMMENT = 'League of Legends match analytics: medallion architecture on in-game interval snapshots.';
 
 
 -------------------------------------------------------------------------------------------

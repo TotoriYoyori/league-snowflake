@@ -3,16 +3,16 @@
 -------------------------------------------------------------------------------------------
 USE DATABASE LEAGUE_RECORDS;
 
-USE SCHEMA L00_STG;
+USE SCHEMA BRONZE;
 
 
 -------------------------------------------------------------------------------------------
-    -- 1. CREATING STAGING TABLE FOR RAW DATA LANDING
+    -- 1. SEED TABLE: Holds the full historical dataset for chunked replay
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE STG_INTERVALS (
+CREATE OR REPLACE TABLE SEED_INTERVALS (
     -- Identifier
-  MATCH_ID VARCHAR(255) NOT NULL,
   ID NUMBER(38,0) NOT NULL,
+  MATCH_ID VARCHAR(255) NOT NULL,
   PLAYER_ID NUMBER(38,0) NOT NULL,
     -- Economy
   MINUTE NUMBER(2,0) NOT NULL,
@@ -51,11 +51,30 @@ CREATE OR REPLACE TABLE STG_INTERVALS (
     -- Stats Diff
   GOLD_DIFF NUMBER(38,0),
   XP_DIFF NUMBER(38,0),
-  TEAM_GOLD_DIFF NUMBER(38,0),
-    -- Metadata
-  LDTS TIMESTAMP_NTZ(9) NOT NULL,
-  FILE_NAME VARCHAR(255) NOT NULL,
-  FILE_ROW_NUMBER NUMBER(38,0) NOT NULL,
-  RSRC VARCHAR(255) NOT NULL
+  TEAM_GOLD_DIFF NUMBER(38,0)
 )
-COMMENT = 'League matches statistics, snapshot every 5 minutes.';
+COMMENT = 'Full historical dataset used as source for simulated daily ingestion.';
+
+
+-------------------------------------------------------------------------------------------
+    -- 2. SEED_MATCH_INDEX: Deterministic ordering of distinct matches for chunking
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW SEED_MATCH_INDEX AS
+SELECT
+    MATCH_ID,
+    ROW_NUMBER() OVER (ORDER BY MATCH_ID) - 1 AS MATCH_SEQ
+FROM (SELECT DISTINCT MATCH_ID FROM SEED_INTERVALS);
+
+
+-------------------------------------------------------------------------------------------
+    -- 3. STATE TABLE: Tracks match-based chunking offset for SIMULATE_DAILY_LOAD()
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE TABLE SEED_LOAD_STATE (
+    CURRENT_MATCH_OFFSET NUMBER(38,0) NOT NULL DEFAULT 0,
+    MATCHES_PER_BATCH NUMBER(38,0) NOT NULL DEFAULT 1000,
+    LAST_LOADED_AT TIMESTAMP_NTZ
+)
+COMMENT = 'Tracks the current match offset for the daily load simulation procedure.';
+
+INSERT INTO SEED_LOAD_STATE (CURRENT_MATCH_OFFSET, MATCHES_PER_BATCH, LAST_LOADED_AT)
+VALUES (0, 1000, NULL);

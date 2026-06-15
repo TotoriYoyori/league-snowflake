@@ -23,13 +23,8 @@ AS
 SELECT 
     -- Keep all original columns
     SRC.*,
-    -- With new column -> Hub Key
-    FASTHASH(ARRAY_TO_STRING(ARRAY_CONSTRUCT(
-        TRIM(ID),
-        UPPER(TRIM(MATCH_ID)), 
-        TRIM(PLAYER_ID),
-        TRIM(MINUTE)
-    ), '^')) AS SHA1_HUB_INTERVAL,
+    -- With new column -> Hub Key (hashed from source surrogate ID only)
+    FASTHASH(TRIM(TO_VARCHAR(ID))) AS SHA1_HUB_INTERVAL,
     -- With new column -> Record's Hash Diff
     FASTHASH(ARRAY_TO_STRING(ARRAY_CONSTRUCT(
         CURRENT_GOLD, TOTAL_GOLD,

@@ -42,7 +42,7 @@ BEGIN
     -- Copy chunk to @DAILY_MATCH_STG
     EXECUTE IMMEDIATE
         'COPY INTO @DAILY_MATCH_STG/' || :v_file_name ||
-        ' FROM (SELECT MATCH_ID, ID, PLAYER_ID, MINUTE,' ||
+        ' FROM (SELECT ID, MATCH_ID, PLAYER_ID, MINUTE,' ||
         ' CURRENT_GOLD, TOTAL_GOLD, CS, JUNGLE_CS, XP, LEVEL,' ||
         ' KILLS, DEATHS, ASSISTS,' ||
         ' ITEM_0, ITEM_1, ITEM_2, ITEM_3, ITEM_4, ITEM_5, ITEM_6,' ||
