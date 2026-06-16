@@ -8,100 +8,129 @@ This guide walks you through deploying the League of Legends match analytics pip
 
 - A Snowflake account with `ACCOUNTADMIN` privileges (a free trial gives you 30 days)
 - A Snowsight worksheet (for running SQL and `PUT` commands)
-
----
-
-## What's in `bootstrap/`
-
-Copy the contents of the `bootstrap/` folder into your own Snowflake workspace and run the scripts in order:
-
-| # | File | What it does |
-|---|---|---|
-| 1 | `bootstrap.sql` | Creates the warehouse, database, GitHub integration, fetches the repo, and runs `deploy.sql` |
-| 2 | `deploy.sql` | Executed automatically by `bootstrap.sql` — builds schemas, tables, stages, file formats, streams, and tasks |
-| 3 | `04_seed_staging_table.sql` | Uploads the downloaded CSV into `@DAILY_MATCH_SEED_STG` |
+- The source CSV files downloaded locally
 
 ---
 
 ## Step 1 — Download the Dataset
 
 1. Go to the release page: **https://github.com/TotoriYoyori/league-snowflake/releases/tag/sample**
-2. Under **Assets**, download `intervals.csv` to your local machine
-3. Note the full local path (e.g. `/Users/you/Downloads/intervals.csv`)
-
-The file is ~250 MB and contains 2.1 million match interval snapshots.
+2. Under **Assets**, download the following files:
+   - `matches_summary.csv` (~40K rows)
+   - `players_summary.csv` (~400K rows)
+   - `match_intervals.csv` (~2.1M rows)
+   - `items_ref.csv` (635 rows)
+   - `champions_ref.csv` (173 rows)
+3. Note the local paths (e.g. `/Users/you/Downloads/matches_summary.csv`)
 
 ---
 
-## Step 2 — Copy `bootstrap/` to Your Workspace and Run
+## Step 2 — Run Bootstrap
 
-1. Create a new Snowflake workspace (or use an existing one)
-2. Copy the contents of the `bootstrap/` folder into it
-3. Open `bootstrap.sql` in a **SQL worksheet** and run it top to bottom as `ACCOUNTADMIN`
+1. Open `setup/01_bootstrap.sql` in a **Snowsight SQL worksheet** (not inside a workspace)
+2. Run it top to bottom as `ACCOUNTADMIN`
 
 This creates:
 - The `DV_COMPUTE_WH` warehouse
 - The `LEAGUE_RECORDS` database
 - A GitHub API integration pointing at this repo
-- Fetches the repo and executes `deploy.sql`, which builds all schemas, tables, streams, tasks, file formats, and stages
-
-4. Open `04_seed_staging_table.sql` in a **Snowsight worksheet** (not a Notebook — `PUT` requires a classic worksheet to read from your local filesystem)
-5. Update the `PUT` path to match where you saved the file, then run:
-
-```sql
-PUT file:///Users/you/Downloads/intervals.csv @DAILY_MATCH_SEED_STG
-    AUTO_COMPRESS = TRUE
-    OVERWRITE = TRUE;
-```
-
-This uploads the full dataset into `@DAILY_MATCH_SEED_STG`. This stage holds the original, complete dataset only.
+- Fetches the repo and executes `setup/02_deploy.sql`, which builds all schemas, seed tables, bronze tables, stages, pipes, and procedures
 
 ---
 
-## Simulating Daily Ingestion
+## Step 3 — Seed the Source Data
 
-In production, league clients upload a new batch of match records each day (e.g. `match_20250601.csv`, `match_20250602.csv`). These land in `@DAILY_MATCH_AZSTG`, which triggers the stream/task pipeline.
+Open `setup/03_seed_staging_tables.sql` in a **Snowsight worksheet** (PUT requires a classic worksheet).
 
-To simulate this, `tools/simulate_stream.py` reads from the seed stage, splits the data into daily-sized chunks, and uploads each chunk to `@DAILY_MATCH_AZSTG`. Each upload triggers the stream → task pipeline and populates `HUB_INTERVALS` and `SAT_INTERVALS` automatically.
+Update the file paths and run each section:
 
-### How to schedule this in Snowflake
+```sql
+-- 1. Upload to table stages
+PUT file:///Users/you/Downloads/matches_summary.csv @LEAGUE_RECORDS.SEED.%SEED_MATCHES_SUMMARY AUTO_COMPRESS = TRUE OVERWRITE = TRUE;
+PUT file:///Users/you/Downloads/players_summary.csv @LEAGUE_RECORDS.SEED.%SEED_PLAYERS_SUMMARY AUTO_COMPRESS = TRUE OVERWRITE = TRUE;
+PUT file:///Users/you/Downloads/match_intervals.csv @LEAGUE_RECORDS.SEED.%SEED_MATCH_INTERVALS AUTO_COMPRESS = TRUE OVERWRITE = TRUE;
+PUT file:///Users/you/Downloads/items_ref.csv @LEAGUE_RECORDS.SEED.%SEED_ITEMS_REF AUTO_COMPRESS = TRUE OVERWRITE = TRUE;
+PUT file:///Users/you/Downloads/champions_ref.csv @LEAGUE_RECORDS.SEED.%SEED_CHAMPIONS_REF AUTO_COMPRESS = TRUE OVERWRITE = TRUE;
 
-Rather than running a Python script locally on a cron, you can keep this entirely inside Snowflake using a **Task + Stored Procedure**:
+-- 2. Load into seed tables
+COPY INTO LEAGUE_RECORDS.SEED.SEED_MATCHES_SUMMARY FILE_FORMAT = LEAGUE_RECORDS.BRONZE.LEAGUE_CSV_FMT;
+COPY INTO LEAGUE_RECORDS.SEED.SEED_PLAYERS_SUMMARY FILE_FORMAT = LEAGUE_RECORDS.BRONZE.LEAGUE_CSV_FMT;
+COPY INTO LEAGUE_RECORDS.SEED.SEED_MATCH_INTERVALS FILE_FORMAT = LEAGUE_RECORDS.BRONZE.LEAGUE_CSV_FMT;
+COPY INTO LEAGUE_RECORDS.SEED.SEED_ITEMS_REF FILE_FORMAT = LEAGUE_RECORDS.BRONZE.LEAGUE_CSV_FMT;
+COPY INTO LEAGUE_RECORDS.SEED.SEED_CHAMPIONS_REF FILE_FORMAT = LEAGUE_RECORDS.BRONZE.LEAGUE_CSV_FMT;
+```
 
-1. A **Python stored procedure** reads from `@DAILY_MATCH_SEED_STG`, picks the next chunk of rows, and writes it to `@DAILY_MATCH_AZSTG` as `chunk_{YYYYMMDD}.csv`
-2. A **Snowflake Task** runs that procedure on a daily schedule (e.g. `SCHEDULE = 'USING CRON 0 6 * * * UTC'`)
+---
 
-This way Snowflake handles the scheduling natively — no external orchestrator, no local machine running overnight. The existing stream/task pipeline picks up each new file automatically.
+## Step 4 — Load Reference Data into Bronze
 
-> This is planned but not yet implemented in this repo. For now, run `simulate_stream.py` manually or on a local cron.
+Reference tables (items, champions) go through their pipe just once:
+
+```sql
+-- Stage reference data from seed
+COPY INTO @LEAGUE_RECORDS.BRONZE.REFERENCE_STG/items_ref.csv
+FROM (SELECT ITEM_ID, ITEM_NAME FROM LEAGUE_RECORDS.SEED.SEED_ITEMS_REF)
+FILE_FORMAT = (TYPE = CSV HEADER = TRUE) OVERWRITE = TRUE SINGLE = TRUE;
+
+COPY INTO @LEAGUE_RECORDS.BRONZE.REFERENCE_STG/champions_ref.csv
+FROM (SELECT CHAMPION_ID, CHAMPION_NAME FROM LEAGUE_RECORDS.SEED.SEED_CHAMPIONS_REF)
+FILE_FORMAT = (TYPE = CSV HEADER = TRUE) OVERWRITE = TRUE SINGLE = TRUE;
+
+-- Refresh reference pipes
+ALTER PIPE LEAGUE_RECORDS.BRONZE.ITEMS_REF_PP REFRESH;
+ALTER PIPE LEAGUE_RECORDS.BRONZE.CHAMPIONS_REF_PP REFRESH;
+```
+
+---
+
+## Step 5 — Simulate Daily Ingestion
+
+Each call to `SIMULATE_DAILY_LOAD()` stages one day's worth of data (latest date first) across all three fact tables, then refreshes the pipes:
+
+```sql
+CALL LEAGUE_RECORDS.SEED.SIMULATE_DAILY_LOAD();
+```
+
+Example output:
+```
+Loaded date 2026-01-30. Next date: 2026-01-29 (min: 2024-06-15).
+```
+
+Call it repeatedly to ingest more days. The procedure tracks state automatically and stops when all dates are exhausted.
 
 ---
 
 ## Verifying the Pipeline
 
-After seeding and running the simulate script, check that each layer is populated:
+After running a few loads, check that bronze tables are populated:
 
 ```sql
--- Staging layer
-SELECT COUNT(*) FROM LEAGUE_RECORDS.L00_STG.STG_INTERVALS;
+SELECT COUNT(*) FROM LEAGUE_RECORDS.BRONZE.MATCHES_SUMMARY_BRONZE;
+SELECT COUNT(*) FROM LEAGUE_RECORDS.BRONZE.PLAYERS_SUMMARY_BRONZE;
+SELECT COUNT(*) FROM LEAGUE_RECORDS.BRONZE.MATCH_INTERVALS_BRONZE;
+SELECT COUNT(*) FROM LEAGUE_RECORDS.BRONZE.ITEMS_REF_BRONZE;
+SELECT COUNT(*) FROM LEAGUE_RECORDS.BRONZE.CHAMPIONS_REF_BRONZE;
 
--- Raw Data Vault
-SELECT COUNT(*) FROM LEAGUE_RECORDS.L10_RDV.HUB_INTERVALS;
-SELECT COUNT(*) FROM LEAGUE_RECORDS.L10_RDV.SAT_INTERVALS;
+-- Check load state
+SELECT * FROM LEAGUE_RECORDS.SEED.SEED_LOAD_STATE;
 
--- Stream status
-SHOW STREAMS IN DATABASE LEAGUE_RECORDS;
+-- Check pipe status
+SHOW PIPES IN SCHEMA LEAGUE_RECORDS.BRONZE;
 ```
-
-Key things to check:
-- `STG_INTERVALS` has rows after the first chunk lands in `@DAILY_MATCH_AZSTG`
-- `HUB_INTERVALS` and `SAT_INTERVALS` populate within ~1 minute (the task runs on a 1-minute schedule)
-- The stream shows as active
 
 ---
 
-## Architecture Reference
+## Deploy Order Reference
 
-For a full explanation of the pipeline architecture, the data vault modeling approach, and the production Azure ingestion pattern this demo simulates, see `README.md`.
+The `setup/02_deploy.sql` executes scripts in this order:
 
-The Azure integration (`infrastructure/02a_azure_integrated_stage.sql`) documents what `@DAILY_MATCH_AZSTG` would be replaced with in production — an Azure Blob Storage stage with Snowpipe auto-ingest triggered by Event Grid.
+| # | Script | Creates |
+|---|--------|---------|
+| 1 | `infra/01_db_and_schema.sql` | Database + SEED/BRONZE/SILVER/GOLD schemas |
+| 2 | `infra/02_seed_tables.sql` | Seed tables, date index view, load state |
+| 3 | `bronze/01_matches_summary_bronze.sql` | Matches summary landing table |
+| 4 | `bronze/02_players_summary_bronze.sql` | Players summary landing table |
+| 5 | `bronze/03_match_intervals_bronze.sql` | Match intervals landing table |
+| 6 | `bronze/04_references_bronze.sql` | Items + champions reference tables |
+| 7 | `bronze/05_stages_and_pipes.sql` | File format, stages, pipes |
+| 8 | `infra/03_simulate_daily_load.sql` | Staging procedures + orchestrator |

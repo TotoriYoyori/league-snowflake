@@ -7,9 +7,10 @@ USE SCHEMA BRONZE;
 
 
 -------------------------------------------------------------------------------------------
-    -- 1. SEED TABLE: Holds the full historical dataset for chunked replay
+    -- 1. BRONZE TABLE: Raw match interval data with load metadata
+    -- Direct landing table from pipe ingestion. No transformations applied.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_INTERVALS (
+CREATE OR REPLACE TABLE MATCH_INTERVALS_BRONZE (
     -- Identifier
   ID NUMBER(38,0) NOT NULL,
   MATCH_ID VARCHAR(255) NOT NULL,
@@ -51,30 +52,21 @@ CREATE OR REPLACE TABLE SEED_INTERVALS (
     -- Stats Diff
   GOLD_DIFF NUMBER(38,0),
   XP_DIFF NUMBER(38,0),
-  TEAM_GOLD_DIFF NUMBER(38,0)
+  TEAM_GOLD_DIFF NUMBER(38,0),
+    -- Load Metadata
+  LDTS TIMESTAMP_NTZ(9) NOT NULL,
+  FILE_NAME VARCHAR(255) NOT NULL,
+  FILE_ROW_NUMBER NUMBER(38,0) NOT NULL,
+  RSRC VARCHAR(255) NOT NULL,
+    -- Constraints
+  CONSTRAINT MATCH_INTERVALS_BRONZE_PKEY PRIMARY KEY (ID)
 )
-COMMENT = 'Full historical dataset used as source for simulated daily ingestion.';
+COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via MATCH_INTERVALS_PP from @MATCH_INTERVALS_STG.';
 
 
 -------------------------------------------------------------------------------------------
-    -- 2. SEED_MATCH_INDEX: Deterministic ordering of distinct matches for chunking
+    -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW SEED_MATCH_INDEX AS
-SELECT
-    MATCH_ID,
-    ROW_NUMBER() OVER (ORDER BY MATCH_ID) - 1 AS MATCH_SEQ
-FROM (SELECT DISTINCT MATCH_ID FROM SEED_INTERVALS);
-
-
--------------------------------------------------------------------------------------------
-    -- 3. STATE TABLE: Tracks match-based chunking offset for SIMULATE_DAILY_LOAD()
--------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_LOAD_STATE (
-    CURRENT_MATCH_OFFSET NUMBER(38,0) NOT NULL DEFAULT 0,
-    MATCHES_PER_BATCH NUMBER(38,0) NOT NULL DEFAULT 1000,
-    LAST_LOADED_AT TIMESTAMP_NTZ
-)
-COMMENT = 'Tracks the current match offset for the daily load simulation procedure.';
-
-INSERT INTO SEED_LOAD_STATE (CURRENT_MATCH_OFFSET, MATCHES_PER_BATCH, LAST_LOADED_AT)
-VALUES (0, 1000, NULL);
+CREATE OR REPLACE STREAM MATCH_INTERVALS_BRONZE_STM
+    ON TABLE MATCH_INTERVALS_BRONZE
+    COMMENT = 'MATCH_INTERVALS_BRONZE delta --> BRONZE_TO_SILVER_INTERVALS_TASK --> MATCH_INTERVALS_SILVER';
