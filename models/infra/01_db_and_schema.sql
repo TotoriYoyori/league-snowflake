@@ -6,8 +6,11 @@ CREATE DATABASE IF NOT EXISTS LEAGUE_RECORDS
 
 
 -------------------------------------------------------------------------------------------
-    -- 2. CREATE SCHEMAS FOR EACH MEDALLION LAYER
+    -- 2. CREATE SCHEMAS
 -------------------------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.SEED
+    COMMENT = 'Make-pretend source system: full big CSVs loaded once, as if from a database. Used in simulated ingestion.';
+
 CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.BRONZE
     COMMENT = 'Raw ingestion layer: unmodified source data with load metadata.';
 
