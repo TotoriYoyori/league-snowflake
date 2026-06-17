@@ -32,7 +32,8 @@ BEGIN
         '  JOIN SEED.SEED_MATCH_DATE_INDEX idx ON s.MATCH_ID = idx.MATCH_ID' ||
         '  WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''' ||
         ')' ||
-        ' FILE_FORMAT = (TYPE = CSV HEADER = TRUE)' ||
+        ' FILE_FORMAT = (TYPE = CSV)' ||
+        ' HEADER = TRUE' ||
         ' OVERWRITE = FALSE SINGLE = TRUE';
 
     RETURN 'Staged matches for ' || :P_GAME_DATE || ' → @MATCHES_SUMMARY_STG/' || :v_file_name;
@@ -63,7 +64,8 @@ BEGIN
         '  JOIN SEED.SEED_MATCH_DATE_INDEX idx ON p.MATCH_ID = idx.MATCH_ID' ||
         '  WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''' ||
         ')' ||
-        ' FILE_FORMAT = (TYPE = CSV HEADER = TRUE)' ||
+        ' FILE_FORMAT = (TYPE = CSV)' ||
+        ' HEADER = TRUE' ||
         ' OVERWRITE = FALSE SINGLE = TRUE';
 
     RETURN 'Staged players for ' || :P_GAME_DATE || ' → @PLAYERS_SUMMARY_STG/' || :v_file_name;
@@ -101,7 +103,8 @@ BEGIN
         '  JOIN SEED.SEED_MATCH_DATE_INDEX idx ON i.MATCH_ID = idx.MATCH_ID' ||
         '  WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''' ||
         ')' ||
-        ' FILE_FORMAT = (TYPE = CSV HEADER = TRUE)' ||
+        ' FILE_FORMAT = (TYPE = CSV)' ||
+        ' HEADER = TRUE' ||
         ' OVERWRITE = FALSE SINGLE = TRUE';
 
     RETURN 'Staged intervals for ' || :P_GAME_DATE || ' → @MATCH_INTERVALS_STG/' || :v_file_name;
