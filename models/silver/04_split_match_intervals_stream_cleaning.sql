@@ -1,8 +1,13 @@
+-------------------------------------------------------------------------------------------
+    -- 0. DECLARE WORKING CONTEXT
+-------------------------------------------------------------------------------------------
 USE DATABASE LEAGUE_RECORDS;
+
 USE SCHEMA SILVER;
 
+
 -------------------------------------------------------------------------------------------
-    -- 0. HELPER UDF: impute NULL with a supplied average, floor at CLAMP_FLOOR
+    -- 1. HELPER UDF: impute NULL with a supplied average, floor at CLAMP_FLOOR
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION IMPUTE_WITH_AVG(RAW_VALUE NUMBER, AVG_VALUE FLOAT, CLAMP_FLOOR NUMBER)
 RETURNS NUMBER
@@ -14,7 +19,7 @@ COMMENT = '[SILVER] Imputes NULL with AVG_VALUE, floored at CLAMP_FLOOR.';
 
 
 -------------------------------------------------------------------------------------------
-    -- 1. BASE: decode identifiers, normalize minute, normalize "no item" sentinel.
+    -- 2. BASE: decode identifiers, normalize minute, normalize "no item" sentinel.
     --    No imputation/averaging here -- that all happens in IMPUTED below.
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW MATCH_INTERVALS_BRONZE_STM_TO_SILVER AS
@@ -50,7 +55,7 @@ WITH base AS (
 ),
 
 -------------------------------------------------------------------------------------------
-    -- 2. AVERAGE_CALC: one row per MINUTE, the global per-minute average for
+    -- 3. AVERAGE_CALC: one row per MINUTE, the global per-minute average for
     --    every column that may need null-imputation. Feeds IMPUTE_WITH_AVG below.
 -------------------------------------------------------------------------------------------
 average_calc AS (
@@ -85,7 +90,7 @@ average_calc AS (
 ),
 
 -------------------------------------------------------------------------------------------
-    -- 3. IMPUTED: apply IMPUTE_WITH_AVG(raw, avg, clamp_floor) per column, joining
+    -- 4. IMPUTED: apply IMPUTE_WITH_AVG(raw, avg, clamp_floor) per column, joining
     --    to the per-minute averages computed above. Most stats floor at 0;
     --    CURRENT_GOLD and the *_DIFF columns floor at a large negative bound
     --    since they're allowed to go negative but not unboundedly so.
@@ -129,7 +134,7 @@ imputed AS (
 ),
 
 -------------------------------------------------------------------------------------------
-    -- 4. ITEM_NAMES: resolve the 6 item ids to names. ITEMS_REF_SILVER has no
+    -- 5. ITEM_NAMES: resolve the 6 item ids to names. ITEMS_REF_SILVER has no
     --    row for id=0, and BASE already normalized 0 -> NULL, so each join
     --    naturally returns NULL for "no item".
 -------------------------------------------------------------------------------------------
@@ -150,7 +155,7 @@ item_names AS (
 )
 
 -------------------------------------------------------------------------------------------
-    -- 5. FINAL SELECT: join IMPUTED to ITEM_NAMES on ID, apply the
+    -- 6. FINAL SELECT: join IMPUTED to ITEM_NAMES on ID, apply the
     --    CURRENT_GOLD/TOTAL_GOLD cross-column clamp. This is what the view exposes.
 -------------------------------------------------------------------------------------------
 SELECT
