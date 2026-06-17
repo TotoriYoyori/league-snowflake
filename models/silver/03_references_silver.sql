@@ -48,7 +48,7 @@ COMMENT = '[SILVER] Cleaned item reference. Deduped by name, HTML names extracte
     -- 3. TASK: Merge new/changed rows from cleaning view into ITEMS_REF_SILVER
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE_TO_SILVER_ITEMS_TASK
-    WAREHOUSE = DV_COMPUTE_WH
+    WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.ITEMS_REF_BRONZE_STM')
 AS
@@ -89,7 +89,7 @@ COMMENT = '[SILVER] Cleaned champion reference. PascalCase names split to Title 
     -- 6. TASK: Merge new/changed rows from cleaning view into CHAMPIONS_REF_SILVER
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE_TO_SILVER_CHAMPIONS_TASK
-    WAREHOUSE = DV_COMPUTE_WH
+    WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.CHAMPIONS_REF_BRONZE_STM')
 AS

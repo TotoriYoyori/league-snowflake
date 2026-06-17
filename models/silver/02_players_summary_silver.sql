@@ -57,7 +57,7 @@ COMMENT = '[SILVER] Cleaned player summary. Team normalized, lane standardized, 
     -- 3. TASK: Merge new/changed rows from cleaning view into PLAYERS_SUMMARY_SILVER
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE_TO_SILVER_PLAYERS_TASK
-    WAREHOUSE = DV_COMPUTE_WH
+    WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.PLAYERS_SUMMARY_BRONZE_STM')
 AS

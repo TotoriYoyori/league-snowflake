@@ -49,7 +49,7 @@ COMMENT = '[SILVER] Cleaned match summary. Types cast, team normalized, bans san
     -- 3. TASK: Merge new/changed rows from cleaning view into MATCHES_SUMMARY_SILVER
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE_TO_SILVER_MATCHES_TASK
-    WAREHOUSE = DV_COMPUTE_WH
+    WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.MATCHES_SUMMARY_BRONZE_STM')
 AS

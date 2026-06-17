@@ -1,0 +1,40 @@
+-- Medallion architecture deployment script for League of Legends match data pipeline
+-- Co-authored with CoCo
+-------------------------------------------------------------------------------------------
+-- LEAGUE-SNOWFLAKE DEPLOYMENT SCRIPT (MEDALLION ARCHITECTURE)
+-------------------------------------------------------------------------------------------
+CREATE DATABASE IF NOT EXISTS LEAGUE_RECORDS
+    COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo and standard League of Legends matches.';
+
+USE WAREHOUSE COMPUTE_WH;
+
+-------------------------------------------------------------------------------------------
+-- INFRASTRUCTURE
+-------------------------------------------------------------------------------------------
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/01_db_and_schema.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/02_seed_tables.sql';
+
+-------------------------------------------------------------------------------------------
+-- BRONZE - RAW INGESTION
+-------------------------------------------------------------------------------------------
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/01_matches_summary_bronze.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/02_players_summary_bronze.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/03_match_intervals_bronze.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/04_references_bronze.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/05_stages_and_pipes.sql';
+
+-------------------------------------------------------------------------------------------
+-- SILVER - CLEANED & ENRICHED
+-------------------------------------------------------------------------------------------
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/01_matches_summary_silver.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/02_players_summary_silver.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/03_references_silver.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/04_split_match_intervals_stream_cleaning.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/05a_team_interval_silver.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/05b_player_interval_silver.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/06_bronze_to_silver_intervals_task.sql';
+
+-------------------------------------------------------------------------------------------
+-- PROCEDURES
+-------------------------------------------------------------------------------------------
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/03_simulate_daily_load.sql';
