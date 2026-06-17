@@ -22,14 +22,28 @@ BEGIN
     -- (Snowflake doesn't enforce FKs, but keep insert order consistent with the relationship)
     MERGE INTO SILVER.TEAM_INTERVAL_SILVER AS tgt
     USING (
-        SELECT DISTINCT
+        -- MAX() collapses the 5 duplicate player rows per team-minute into one
+        -- deterministic value per column, even if individual rows differ due to
+        -- per-row imputation noise -- avoids the duplicate-ID risk of SELECT DISTINCT
+        SELECT
             ABS(HASH(MATCH_ID, TEAM, MINUTE))  AS ID,
             MATCH_ID, TEAM, MINUTE,
-            TEAM_KILLS, TEAM_INHIBITORS, TEAM_TOWERS,
-            TEAM_DRAGONS_FIRE, TEAM_DRAGONS_WATER, TEAM_DRAGONS_EARTH,
-            TEAM_DRAGONS_AIR, TEAM_DRAGONS_CHEMTECH, TEAM_DRAGONS_HEXTECH, TEAM_DRAGONS,
-            TEAM_BARONS, TEAM_VOID_GRUBS, TEAM_HERALDS, TEAM_GOLD_DIFF
+            MAX(TEAM_KILLS)            AS TEAM_KILLS,
+            MAX(TEAM_INHIBITORS)       AS TEAM_INHIBITORS,
+            MAX(TEAM_TOWERS)           AS TEAM_TOWERS,
+            MAX(TEAM_DRAGONS_FIRE)     AS TEAM_DRAGONS_FIRE,
+            MAX(TEAM_DRAGONS_WATER)    AS TEAM_DRAGONS_WATER,
+            MAX(TEAM_DRAGONS_EARTH)    AS TEAM_DRAGONS_EARTH,
+            MAX(TEAM_DRAGONS_AIR)      AS TEAM_DRAGONS_AIR,
+            MAX(TEAM_DRAGONS_CHEMTECH) AS TEAM_DRAGONS_CHEMTECH,
+            MAX(TEAM_DRAGONS_HEXTECH)  AS TEAM_DRAGONS_HEXTECH,
+            MAX(TEAM_DRAGONS)          AS TEAM_DRAGONS,
+            MAX(TEAM_BARONS)           AS TEAM_BARONS,
+            MAX(TEAM_VOID_GRUBS)       AS TEAM_VOID_GRUBS,
+            MAX(TEAM_HERALDS)          AS TEAM_HERALDS,
+            MAX(TEAM_GOLD_DIFF)        AS TEAM_GOLD_DIFF
         FROM SILVER.MATCH_INTERVALS_BRONZE_STM_TO_SILVER
+        GROUP BY MATCH_ID, TEAM, MINUTE
     ) AS src
         ON tgt.ID = src.ID
     WHEN MATCHED THEN UPDATE SET
