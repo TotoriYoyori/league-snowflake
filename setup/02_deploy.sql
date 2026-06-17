@@ -25,8 +25,11 @@ EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/b
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/01_matches_summary_silver.sql;
 EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/02_players_summary_silver.sql;
-EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/03_match_intervals_silver.sql;
 EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/04_references_silver.sql;
+EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/03_split_match_intervals_stream_cleaning.sql;
+EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/04a_team_interval_silver.sql;
+EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/04b_player_interval_silver.sql;
+EXECUTE IMMEDIATE FROM @LEAGUE_RECORDS.PUBLIC.LEAGUE_REPO/branches/main/models/silver/05_bronze_to_silver_intervals_task.sql;
 
 -------------------------------------------------------------------------------------------
 -- PROCEDURES
