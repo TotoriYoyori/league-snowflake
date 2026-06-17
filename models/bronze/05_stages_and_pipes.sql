@@ -39,6 +39,11 @@ CREATE OR REPLACE STAGE REFERENCE_STG
     FILE_FORMAT = LEAGUE_CSV_FMT
     COMMENT = 'Stage for reference/lookup CSVs. Expected files: items_ref.csv, champions_ref.csv';
 
+-- Seed upload stage (lives in SEED schema, but created here since LEAGUE_CSV_FMT is defined above)
+CREATE STAGE IF NOT EXISTS SEED.SEED_UPLOAD_STG
+    FILE_FORMAT = LEAGUE_CSV_FMT
+    COMMENT = 'Upload all seed CSVs here via Snowsight UI before running 02_seed_source.sql.';
+
 
 -------------------------------------------------------------------------------------------
     -- 3. PIPES (manual-refresh via ALTER PIPE <pipe> REFRESH, one per source)
