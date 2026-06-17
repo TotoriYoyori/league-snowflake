@@ -2,10 +2,8 @@ USE DATABASE LEAGUE_RECORDS;
 USE SCHEMA SILVER;
 
 -------------------------------------------------------------------------------------------
-    -- SILVER TABLE: Player-minute grain. TEAM is carried here (despite being
-    -- derivable from PARTICIPANT_POS_ID) so this table can FK to
-    -- TEAM_INTERVAL_SILVER's natural key and the two can be rejoined into a
-    -- wide view. TEAM_* aggregate columns themselves live only in TEAM_INTERVAL_SILVER.
+    -- PLAYER_INTERVAL_SILVER TABLE: Player-minute grain. (MATCH_ID, TEAM, MINUTE) FK toward
+    -- the team-minute grain. 
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TABLE PLAYER_INTERVAL_SILVER (
     ID                  NUMBER(38,0) NOT NULL,

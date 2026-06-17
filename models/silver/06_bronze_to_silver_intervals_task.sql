@@ -10,7 +10,7 @@ USE SCHEMA SILVER;
     -- advances at COMMIT.
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TASK BRONZE_TO_SILVER_INTERVALS_TASK
-    WAREHOUSE = DV_COMPUTE_WH
+    WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.MATCH_INTERVALS_BRONZE_STM')
 AS

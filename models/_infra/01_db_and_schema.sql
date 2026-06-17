@@ -1,13 +1,8 @@
 -------------------------------------------------------------------------------------------
-    -- 1. CREATE DATABASE
+    -- 1. CREATE SCHEMAS (database created in setup/01_deploy.sql)
 -------------------------------------------------------------------------------------------
-CREATE DATABASE IF NOT EXISTS LEAGUE_RECORDS
-    COMMENT = 'League of Legends match analytics: medallion architecture on in-game interval snapshots.';
+USE DATABASE LEAGUE_RECORDS;
 
-
--------------------------------------------------------------------------------------------
-    -- 2. CREATE SCHEMAS
--------------------------------------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS LEAGUE_RECORDS.SEED
     COMMENT = 'Make-pretend source system: full big CSVs loaded once, as if from a database. Used in simulated ingestion.';
 
