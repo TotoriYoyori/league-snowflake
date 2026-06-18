@@ -1,15 +1,10 @@
--- Seed table DDLs, date index view, and load state tracker
--- Co-authored with CoCo
--------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
--------------------------------------------------------------------------------------------
 USE SCHEMA SEED;
 
 
 -------------------------------------------------------------------------------------------
     -- 1. SEED_MATCHES_SUMMARY: Source match-level dataset
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_MATCHES_SUMMARY (
+CREATE OR REPLACE TABLE SEED.SEED_MATCHES_SUMMARY (
     MATCH_ID        VARCHAR(255) NOT NULL,
     GAME_DURATION   NUMBER(38,0),
     PATCH_VERSION   NUMBER(38,0),
@@ -29,7 +24,7 @@ COMMENT = 'Source matches summary dataset. One record --> One match.';
 -------------------------------------------------------------------------------------------
     -- 2. SEED_PLAYERS_SUMMARY: Source player-level dataset
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_PLAYERS_SUMMARY (
+CREATE OR REPLACE TABLE SEED.SEED_PLAYERS_SUMMARY (
     ID                   NUMBER(38,0) NOT NULL,
     MATCH_ID             VARCHAR(255) NOT NULL,
     PARTICIPANT_ID       NUMBER(38,0),
@@ -44,7 +39,7 @@ COMMENT = 'Source players summary dataset. One record --> One player per match.'
 -------------------------------------------------------------------------------------------
     -- 3. SEED_MATCH_INTERVALS: Full interval-level dataset (existing data, renamed)
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_MATCH_INTERVALS (
+CREATE OR REPLACE TABLE SEED.SEED_MATCH_INTERVALS (
     ID              NUMBER(38,0) NOT NULL,
     MATCH_ID        VARCHAR(255) NOT NULL,
     PLAYER_ID       NUMBER(38,0) NOT NULL,
@@ -88,7 +83,7 @@ COMMENT = 'Source match intervals dataset. One record --> One row per player per
 -------------------------------------------------------------------------------------------
     -- 4. SEED_ITEMS_REF: Item ID to name lookup
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_ITEMS_REF (
+CREATE OR REPLACE TABLE SEED.SEED_ITEMS_REF (
     ITEM_ID    NUMBER(38,0) NOT NULL,
     ITEM_NAME  VARCHAR(255)
 )
@@ -98,7 +93,7 @@ COMMENT = 'Source item reference lookup. One record --> One item.';
 -------------------------------------------------------------------------------------------
     -- 5. SEED_CHAMPIONS_REF: Champion ID to name lookup
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_CHAMPIONS_REF (
+CREATE OR REPLACE TABLE SEED.SEED_CHAMPIONS_REF (
     CHAMPION_ID    NUMBER(38,0) NOT NULL,
     CHAMPION_NAME  VARCHAR(255)
 )
@@ -108,11 +103,11 @@ COMMENT = 'Source champion reference lookup: One record --> One champion.';
 -------------------------------------------------------------------------------------------
     -- 6. SEED_MATCH_DATE_INDEX: Sorted latest date first, for use by SIMULATE_DAILY_LOAD.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW SEED_MATCH_DATE_INDEX AS
+CREATE OR REPLACE VIEW SEED.SEED_MATCH_DATE_INDEX AS
 SELECT
     MATCH_ID,
     DATE(TRY_TO_TIMESTAMP(GAME_DATE)) AS GAME_DATE_DAY
-FROM SEED_MATCHES_SUMMARY
+FROM SEED.SEED_MATCHES_SUMMARY
 WHERE GAME_DATE IS NOT NULL
 ORDER BY GAME_DATE_DAY DESC;
 
@@ -120,7 +115,7 @@ ORDER BY GAME_DATE_DAY DESC;
 -------------------------------------------------------------------------------------------
     -- 7. SEED_LOAD_STATE: Tracks date-based chunking for SIMULATE_DAILY_LOAD
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SEED_LOAD_STATE (
+CREATE OR REPLACE TABLE SEED.SEED_LOAD_STATE (
     CURRENT_LOAD_DATE  DATE,
     MIN_DATE           DATE,
     MAX_DATE           DATE,
@@ -128,14 +123,19 @@ CREATE OR REPLACE TABLE SEED_LOAD_STATE (
 )
 COMMENT = 'Tracks the current date pointer for simulated daily ingestion.';
 
-INSERT INTO SEED_LOAD_STATE (CURRENT_LOAD_DATE, MIN_DATE, MAX_DATE, LAST_LOADED_AT)
+INSERT INTO SEED.SEED_LOAD_STATE (
+    CURRENT_LOAD_DATE, 
+    MIN_DATE, 
+    MAX_DATE,
+    LAST_LOADED_AT
+)
 VALUES (NULL, NULL, NULL, NULL);
 
 
 -------------------------------------------------------------------------------------------
     -- 8. SEED_UPLOAD_STG: Upload all seed CSVs here via Snowsight UI
 -------------------------------------------------------------------------------------------
-CREATE STAGE IF NOT EXISTS SEED_UPLOAD_STG
+CREATE STAGE IF NOT EXISTS SEED.SEED_UPLOAD_STG
     FILE_FORMAT = (
         TYPE = CSV 
         FIELD_DELIMITER = ',' 
@@ -143,4 +143,5 @@ CREATE STAGE IF NOT EXISTS SEED_UPLOAD_STG
         FIELD_OPTIONALLY_ENCLOSED_BY = '"' 
         COMPRESSION = 'AUTO'
     )
+    DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Raw file container for seed CSV uploads via Snowsight UI.';

@@ -1,16 +1,10 @@
--- Bronze match intervals: table, stream, stage, and pipe (self-contained)
--- Co-authored with CoCo
--------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
--------------------------------------------------------------------------------------------
 USE SCHEMA BRONZE;
 
 
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Raw match interval data with load metadata
-    -- Direct landing table from pipe ingestion. No transformations applied.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE MATCH_INTERVALS_BRONZE (
+CREATE OR REPLACE TABLE BRONZE.MATCH_INTERVALS_BRONZE (
     -- Identifier
   ID NUMBER(38,0) NOT NULL,
   MATCH_ID VARCHAR(255) NOT NULL,
@@ -67,26 +61,26 @@ COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via MATCH_INTERVALS_PP 
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STREAM MATCH_INTERVALS_BRONZE_STM
-    ON TABLE MATCH_INTERVALS_BRONZE
+CREATE OR REPLACE STREAM BRONZE.MATCH_INTERVALS_BRONZE_STM
+    ON TABLE BRONZE.MATCH_INTERVALS_BRONZE
     COMMENT = 'MATCH_INTERVALS_BRONZE delta --> BRONZE_TO_SILVER_INTERVALS_TASK --> MATCH_INTERVALS_SILVER';
 
 
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for interval snapshot CSVs
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STAGE MATCH_INTERVALS_STG
-    FILE_FORMAT = LEAGUE_CSV_FMT
+CREATE OR REPLACE STAGE BRONZE.MATCH_INTERVALS_STG
+    FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     COMMENT = 'Stage for per-minute interval snapshot CSVs. Expected file: intervals_YYYYMMDD.csv';
 
 
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PIPE MATCH_INTERVALS_PP
+CREATE OR REPLACE PIPE BRONZE.MATCH_INTERVALS_PP
 COMMENT = 'Match interval snapshot ingestion. Ingest frequency --> Daily.'
 AS
-COPY INTO MATCH_INTERVALS_BRONZE
+COPY INTO BRONZE.MATCH_INTERVALS_BRONZE
 FROM (
     SELECT
         $1,  -- id
@@ -129,5 +123,5 @@ FROM (
         METADATA$FILENAME,
         METADATA$FILE_ROW_NUMBER,
         'League Client Daily Logger'
-    FROM @MATCH_INTERVALS_STG
+    FROM @BRONZE.MATCH_INTERVALS_STG
 );

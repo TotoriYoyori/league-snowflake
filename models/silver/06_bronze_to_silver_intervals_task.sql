@@ -1,16 +1,10 @@
--- Bronze-to-silver intervals task: dual MERGE in one transaction
--- Co-authored with CoCo
 USE SCHEMA SILVER;
 
 -------------------------------------------------------------------------------------------
     -- TASK: Single task merges the shared cleaning view's delta into BOTH
-    -- PLAYER_INTERVAL_SILVER and TEAM_INTERVAL_SILVER inside one explicit
-    -- transaction. Per Snowflake's documented Repeatable Read Isolation for
-    -- streams, both MERGE statements see the same consistent stream snapshot
-    -- as long as they're in the same transaction, and the offset only
-    -- advances at COMMIT.
+    -- PLAYER_INTERVAL_SILVER and TEAM_INTERVAL_SILVER inside one explicit transaction. 
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TASK BRONZE_TO_SILVER_INTERVALS_TASK
+CREATE OR REPLACE TASK SILVER.BRONZE_TO_SILVER_INTERVALS_TASK
     WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.MATCH_INTERVALS_BRONZE_STM')
@@ -19,13 +13,8 @@ EXECUTE IMMEDIATE $$
 BEGIN
     BEGIN TRANSACTION;
 
-    -- TEAM merges first since PLAYER_INTERVAL_SILVER's FK references it
-    -- (Snowflake doesn't enforce FKs, but keep insert order consistent with the relationship)
     MERGE INTO SILVER.TEAM_INTERVAL_SILVER AS tgt
     USING (
-        -- MAX() collapses the 5 duplicate player rows per team-minute into one
-        -- deterministic value per column, even if individual rows differ due to
-        -- per-row imputation noise -- avoids the duplicate-ID risk of SELECT DISTINCT
         SELECT
             ABS(HASH(MATCH_ID, TEAM, MINUTE))  AS ID,
             MATCH_ID, TEAM, MINUTE,
@@ -46,7 +35,9 @@ BEGIN
         FROM SILVER.MATCH_INTERVALS_BRONZE_STM_TO_SILVER
         GROUP BY MATCH_ID, TEAM, MINUTE
     ) AS src
-        ON tgt.ID = src.ID
+        ON  tgt.MATCH_ID = src.MATCH_ID
+        AND tgt.TEAM     = src.TEAM
+        AND tgt.MINUTE   = src.MINUTE
     WHEN MATCHED THEN UPDATE SET
         tgt.TEAM_KILLS              = src.TEAM_KILLS,
         tgt.TEAM_INHIBITORS         = src.TEAM_INHIBITORS,

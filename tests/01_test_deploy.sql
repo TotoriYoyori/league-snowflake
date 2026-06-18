@@ -16,7 +16,7 @@ USE DATABASE TEST_PIPELINE_DB;
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/01_db_and_schema.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/02_seed_tables.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/03_simulate_daily_load.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/04_simulate_daily_load.sql';
 
 -------------------------------------------------------------------------------------------
 -- BRONZE (file format + matches_summary table, stream, stage, pipe)

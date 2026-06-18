@@ -1,15 +1,10 @@
--- Bronze file format: shared CSV format used by all bronze stages and pipes
--- Co-authored with CoCo
--------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
--------------------------------------------------------------------------------------------
 USE SCHEMA BRONZE;
 
 
 -------------------------------------------------------------------------------------------
-    -- 1. SHARED FILE FORMAT FOR ALL CSV INGESTION
+    -- 1. SHARED FILE FORMAT FOR ALL CSV INGESTION IN BRONZE STAGE
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE FILE FORMAT LEAGUE_CSV_FMT
+CREATE OR REPLACE FILE FORMAT BRONZE.LEAGUE_CSV_FMT
     TYPE = 'CSV'
     FIELD_DELIMITER = ','
     SKIP_HEADER = 1

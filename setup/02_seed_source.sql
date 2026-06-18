@@ -1,26 +1,27 @@
--- Seed source data: upload CSVs to named stage via Snowsight UI, then COPY INTO seed tables
--- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
 -- SEED THE FULL HISTORICAL DATASET
--- Run this manually after 01_deploy.sql has created all pipeline objects.
 --
 -- BEFORE RUNNING: Upload your CSV files to @LEAGUE_RECORDS.SEED.SEED_UPLOAD_STG
 -- via the Snowsight UI (Databases > LEAGUE_RECORDS > SEED > Stages > SEED_UPLOAD_STG > Upload).
 --
 -- Expected files:
---   matches_summary.csv      (~40K rows,  <20 MB)
---   players_summary.csv      (~400K rows, <20 MB)
---   intervals.csv.gz          (~2.1M rows, gzip from 270 MB original)
---   items_ref.csv            (635 rows)
---   champions_ref.csv        (173 rows)
---
--- Note: intervals.csv exceeds the 250 MB upload limit.
---       GZIP it first (compresses to ~30-50 MB), then upload the .gz file.
---       COMPRESSION = AUTO in the file format handles decompression automatically.
+--   matches_summary.csv      
+--   players_summary.csv      
+--   intervals.csv.gz          
+--   items_ref.csv            
+--   champions_ref.csv        
 -------------------------------------------------------------------------------------------
 USE WAREHOUSE COMPUTE_WH;
+
 USE DATABASE LEAGUE_RECORDS;
+
 USE SCHEMA SEED;
+
+
+-------------------------------------------------------------------------------------------
+-- 0. VALIDATE: Ensure all required files are present before proceeding
+-------------------------------------------------------------------------------------------
+CALL SEED.VALIDATE_SEED_UPLOAD();
 
 
 -------------------------------------------------------------------------------------------
