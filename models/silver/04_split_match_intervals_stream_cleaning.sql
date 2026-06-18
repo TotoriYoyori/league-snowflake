@@ -9,12 +9,12 @@ CREATE OR REPLACE FUNCTION SILVER.IMPUTE_WITH_AVG(
     AVG_VALUE FLOAT, 
     CLAMP_FLOOR NUMBER
 )
-RETURNS NUMBER
+RETURNS FLOAT
+COMMENT = '[SILVER] Imputes NULL with AVG_VALUE, floored at CLAMP_FLOOR.'
 AS
 $$
     GREATEST(COALESCE(RAW_VALUE, AVG_VALUE), CLAMP_FLOOR)
-$$
-COMMENT = '[SILVER] Imputes NULL with AVG_VALUE, floored at CLAMP_FLOOR.';
+$$;
 
 
 -------------------------------------------------------------------------------------------
