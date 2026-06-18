@@ -3,7 +3,6 @@ USE DATABASE LEAGUE_RECORDS;
 -------------------------------------------------------------------------------------------
 -- TASK ACTIVATION
 -------------------------------------------------------------------------------------------
-
 ALTER TASK SILVER.BRONZE_TO_SILVER_MATCHES_TASK RESUME;
 ALTER TASK SILVER.BRONZE_TO_SILVER_PLAYERS_TASK RESUME;
 ALTER TASK SILVER.BRONZE_TO_SILVER_ITEMS_TASK RESUME;
