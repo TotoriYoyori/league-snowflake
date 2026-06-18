@@ -1,8 +1,8 @@
+-- Bronze match intervals: table, stream, stage, and pipe (self-contained)
+-- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT
+    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
 -------------------------------------------------------------------------------------------
-USE DATABASE LEAGUE_RECORDS;
-
 USE SCHEMA BRONZE;
 
 
@@ -70,3 +70,64 @@ COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via MATCH_INTERVALS_PP 
 CREATE OR REPLACE STREAM MATCH_INTERVALS_BRONZE_STM
     ON TABLE MATCH_INTERVALS_BRONZE
     COMMENT = 'MATCH_INTERVALS_BRONZE delta --> BRONZE_TO_SILVER_INTERVALS_TASK --> MATCH_INTERVALS_SILVER';
+
+
+-------------------------------------------------------------------------------------------
+    -- 3. STAGE: Internal stage for interval snapshot CSVs
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE STAGE MATCH_INTERVALS_STG
+    FILE_FORMAT = LEAGUE_CSV_FMT
+    COMMENT = 'Stage for per-minute interval snapshot CSVs. Expected file: intervals_YYYYMMDD.csv';
+
+
+-------------------------------------------------------------------------------------------
+    -- 4. PIPE: Ingest from stage into bronze table
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE PIPE MATCH_INTERVALS_PP
+COMMENT = 'Match interval snapshot ingestion. Ingest frequency --> Daily.'
+AS
+COPY INTO MATCH_INTERVALS_BRONZE
+FROM (
+    SELECT
+        $1,  -- id
+        $2,  -- match_id
+        $3,  -- player_id
+        $4,  -- minute
+        $5,  -- current_gold
+        $6,  -- total_gold
+        $7,  -- cs
+        $8,  -- jungle_cs
+        $9,  -- xp
+        $10, -- level
+        $11, -- kills
+        $12, -- deaths
+        $13, -- assists
+        $14, -- item_0
+        $15, -- item_1
+        $16, -- item_2
+        $17, -- item_3
+        $18, -- item_4
+        $19, -- item_5
+        $20, -- item_6
+        $21, -- team_kills
+        $22, -- team_inhibitors
+        $23, -- team_towers
+        $24, -- team_dragons_fire
+        $25, -- team_dragons_water
+        $26, -- team_dragons_earth
+        $27, -- team_dragons_air
+        $28, -- team_dragons_chemtech
+        $29, -- team_dragons_hextech
+        $30, -- team_dragons
+        $31, -- team_barons
+        $32, -- team_void_grubs
+        $33, -- team_heralds
+        $34, -- gold_diff
+        $35, -- xp_diff
+        $36, -- team_gold_diff
+        CURRENT_TIMESTAMP(),
+        METADATA$FILENAME,
+        METADATA$FILE_ROW_NUMBER,
+        'League Client Daily Logger'
+    FROM @MATCH_INTERVALS_STG
+);

@@ -1,8 +1,8 @@
+-- Silver matches summary: cleaning view, table, and merge task
+-- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT
+    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
 -------------------------------------------------------------------------------------------
-USE DATABASE LEAGUE_RECORDS;
-
 USE SCHEMA SILVER;
 
 

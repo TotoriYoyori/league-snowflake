@@ -7,6 +7,7 @@ CREATE DATABASE IF NOT EXISTS LEAGUE_RECORDS
     COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo and standard League of Legends matches.';
 
 USE WAREHOUSE COMPUTE_WH;
+USE DATABASE LEAGUE_RECORDS;
 
 -------------------------------------------------------------------------------------------
 -- INFRASTRUCTURE
@@ -17,11 +18,12 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 -------------------------------------------------------------------------------------------
 -- BRONZE - RAW INGESTION
 -------------------------------------------------------------------------------------------
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/00_file_format.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/01_matches_summary_bronze.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/02_players_summary_bronze.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/03_match_intervals_bronze.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/04_references_bronze.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/05_stages_and_pipes.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/04_items_ref_bronze.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/05_champions_ref_bronze.sql';
 
 -------------------------------------------------------------------------------------------
 -- SILVER - CLEANED & ENRICHED

@@ -1,4 +1,5 @@
-USE DATABASE LEAGUE_RECORDS;
+-- Bronze-to-silver intervals task: dual MERGE in one transaction
+-- Co-authored with CoCo
 USE SCHEMA SILVER;
 
 -------------------------------------------------------------------------------------------

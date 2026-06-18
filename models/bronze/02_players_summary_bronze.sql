@@ -1,8 +1,8 @@
+-- Bronze players summary: table, stream, stage, and pipe (self-contained)
+-- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT
+    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
 -------------------------------------------------------------------------------------------
-USE DATABASE LEAGUE_RECORDS;
-
 USE SCHEMA BRONZE;
 
 
@@ -35,3 +35,35 @@ COMMENT = '[BRONZE] Raw player summary. Loaded via PLAYERS_SUMMARY_PP from @PLAY
 CREATE OR REPLACE STREAM PLAYERS_SUMMARY_BRONZE_STM
     ON TABLE PLAYERS_SUMMARY_BRONZE
     COMMENT = 'PLAYERS_SUMMARY_BRONZE delta --> BRONZE_TO_SILVER_PLAYERS_TASK --> PLAYERS_SUMMARY_SILVER';
+
+
+-------------------------------------------------------------------------------------------
+    -- 3. STAGE: Internal stage for player summary CSVs
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE STAGE PLAYERS_SUMMARY_STG
+    FILE_FORMAT = LEAGUE_CSV_FMT
+    COMMENT = 'Stage for player-level summary CSVs. Expected file: players_YYYYMMDD.csv';
+
+
+-------------------------------------------------------------------------------------------
+    -- 4. PIPE: Ingest from stage into bronze table
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE PIPE PLAYERS_SUMMARY_PP
+COMMENT = 'Player summary ingestion. Ingest frequency --> Daily.'
+AS
+COPY INTO PLAYERS_SUMMARY_BRONZE
+FROM (
+    SELECT
+        $1,  -- id
+        $2,  -- match_id
+        $3,  -- participant_id
+        $4,  -- team_id
+        $5,  -- champion
+        $6,  -- role
+        $7,  -- individual_position
+        CURRENT_TIMESTAMP(),
+        METADATA$FILENAME,
+        METADATA$FILE_ROW_NUMBER,
+        'League Client Daily Logger'
+    FROM @PLAYERS_SUMMARY_STG
+);

@@ -1,4 +1,5 @@
-USE DATABASE LEAGUE_RECORDS;
+-- Silver team interval table DDL
+-- Co-authored with CoCo
 USE SCHEMA SILVER;
 
 -------------------------------------------------------------------------------------------
