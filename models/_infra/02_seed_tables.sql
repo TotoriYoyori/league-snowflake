@@ -1,8 +1,8 @@
+-- Seed table DDLs, date index view, and load state tracker
+-- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT
+    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
 -------------------------------------------------------------------------------------------
-USE DATABASE LEAGUE_RECORDS;
-
 USE SCHEMA SEED;
 
 
@@ -130,3 +130,17 @@ COMMENT = 'Tracks the current date pointer for simulated daily ingestion.';
 
 INSERT INTO SEED_LOAD_STATE (CURRENT_LOAD_DATE, MIN_DATE, MAX_DATE, LAST_LOADED_AT)
 VALUES (NULL, NULL, NULL, NULL);
+
+
+-------------------------------------------------------------------------------------------
+    -- 8. SEED_UPLOAD_STG: Upload all seed CSVs here via Snowsight UI
+-------------------------------------------------------------------------------------------
+CREATE STAGE IF NOT EXISTS SEED_UPLOAD_STG
+    FILE_FORMAT = (
+        TYPE = CSV 
+        FIELD_DELIMITER = ',' 
+        SKIP_HEADER = 1
+        FIELD_OPTIONALLY_ENCLOSED_BY = '"' 
+        COMPRESSION = 'AUTO'
+    )
+    COMMENT = 'Raw file container for seed CSV uploads via Snowsight UI.';

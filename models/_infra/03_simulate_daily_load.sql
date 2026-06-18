@@ -1,10 +1,8 @@
 -- Procedures for date-based simulated daily load (descending, gap-aware).
 -- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT
+    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
 -------------------------------------------------------------------------------------------
-USE DATABASE LEAGUE_RECORDS;
-
 USE SCHEMA SEED;
 
 
@@ -32,7 +30,6 @@ BEGIN
         '  JOIN SEED.SEED_MATCH_DATE_INDEX idx ON s.MATCH_ID = idx.MATCH_ID' ||
         '  WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''' ||
         ')' ||
-        ' FILE_FORMAT = (TYPE = CSV)' ||
         ' HEADER = TRUE' ||
         ' OVERWRITE = FALSE SINGLE = TRUE';
 
@@ -64,7 +61,6 @@ BEGIN
         '  JOIN SEED.SEED_MATCH_DATE_INDEX idx ON p.MATCH_ID = idx.MATCH_ID' ||
         '  WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''' ||
         ')' ||
-        ' FILE_FORMAT = (TYPE = CSV)' ||
         ' HEADER = TRUE' ||
         ' OVERWRITE = FALSE SINGLE = TRUE';
 
@@ -103,7 +99,6 @@ BEGIN
         '  JOIN SEED.SEED_MATCH_DATE_INDEX idx ON i.MATCH_ID = idx.MATCH_ID' ||
         '  WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''' ||
         ')' ||
-        ' FILE_FORMAT = (TYPE = CSV)' ||
         ' HEADER = TRUE' ||
         ' OVERWRITE = FALSE SINGLE = TRUE';
 
