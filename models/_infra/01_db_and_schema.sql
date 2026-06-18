@@ -1,5 +1,3 @@
--- Creates SEED, BRONZE, SILVER, GOLD schemas in the active database
--- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
     -- 1. CREATE SCHEMAS (database set by the calling deploy script)
 -------------------------------------------------------------------------------------------

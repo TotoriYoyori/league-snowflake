@@ -1,5 +1,3 @@
--- Medallion architecture deployment script for League of Legends match data pipeline
--- Co-authored with CoCo
 -------------------------------------------------------------------------------------------
 -- LEAGUE-SNOWFLAKE DEPLOYMENT SCRIPT (MEDALLION ARCHITECTURE)
 -------------------------------------------------------------------------------------------
@@ -7,6 +5,7 @@ CREATE DATABASE IF NOT EXISTS LEAGUE_RECORDS
     COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo and standard League of Legends matches.';
 
 USE WAREHOUSE COMPUTE_WH;
+
 USE DATABASE LEAGUE_RECORDS;
 
 -------------------------------------------------------------------------------------------
@@ -39,4 +38,5 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 -------------------------------------------------------------------------------------------
 -- PROCEDURES
 -------------------------------------------------------------------------------------------
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/03_simulate_daily_load.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/03_validate_seed_upload.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/04_simulate_daily_load.sql';

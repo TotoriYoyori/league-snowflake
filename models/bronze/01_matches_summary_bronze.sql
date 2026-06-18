@@ -1,15 +1,10 @@
--- Bronze matches summary: table, stream, stage, and pipe (self-contained)
--- Co-authored with CoCo
--------------------------------------------------------------------------------------------
-    -- 0. DECLARE WORKING CONTEXT (set by calling deploy script)
--------------------------------------------------------------------------------------------
 USE SCHEMA BRONZE;
 
 
 -------------------------------------------------------------------------------------------
-    -- 1. BRONZE TABLE: Match-level summary with load metadata
+    -- 1. TABLE DDL:  Match-level summary with load metadata
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE MATCHES_SUMMARY_BRONZE (
+CREATE OR REPLACE TABLE BRONZE.MATCHES_SUMMARY_BRONZE (
     -- Source columns
     MATCH_ID        VARCHAR(255) NOT NULL,
     GAME_DURATION   NUMBER(38,0),
@@ -37,26 +32,26 @@ COMMENT = '[BRONZE] Raw match summary. Loaded via MATCHES_SUMMARY_PP from @MATCH
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STREAM MATCHES_SUMMARY_BRONZE_STM
-    ON TABLE MATCHES_SUMMARY_BRONZE
+CREATE OR REPLACE STREAM BRONZE.MATCHES_SUMMARY_BRONZE_STM
+    ON TABLE BRONZE.MATCHES_SUMMARY_BRONZE
     COMMENT = 'MATCHES_SUMMARY_BRONZE delta --> BRONZE_TO_SILVER_MATCHES_TASK --> MATCHES_SUMMARY_SILVER';
 
 
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for match summary CSVs
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STAGE MATCHES_SUMMARY_STG
-    FILE_FORMAT = LEAGUE_CSV_FMT
+CREATE OR REPLACE STAGE BRONZE.MATCHES_SUMMARY_STG
+    FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     COMMENT = 'Stage for match-level summary CSVs. Expected file: matches_YYYYMMDD.csv';
 
 
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PIPE MATCHES_SUMMARY_PP
+CREATE OR REPLACE PIPE BRONZE.MATCHES_SUMMARY_PP
 COMMENT = 'Match summary ingestion. Ingest frequency --> Daily.'
 AS
-COPY INTO MATCHES_SUMMARY_BRONZE
+COPY INTO BRONZE.MATCHES_SUMMARY_BRONZE
 FROM (
     SELECT
         $1,  -- match_id
@@ -75,5 +70,5 @@ FROM (
         METADATA$FILENAME,
         METADATA$FILE_ROW_NUMBER,
         'League Client Daily Logger'
-    FROM @MATCHES_SUMMARY_STG
+    FROM @BRONZE.MATCHES_SUMMARY_STG
 );
