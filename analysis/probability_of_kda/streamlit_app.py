@@ -4,9 +4,16 @@ import math
 import numpy as np
 import pandas as pd
 
-# --- Connection ---
-conn = st.connection("snowflake", ttl=os.getenv("SNOWFLAKE_CONNECTION_TTL"))
-session = conn.session()
+from src_data import get_session, get_data
+from src_query import ProbabilityOfKDAQuery
+
+# ----- Get Data
+session = get_session()
+query = ProbabilityOfKDAQuery(
+    order_direction="ASC",
+    include_kda_ratio=True
+)
+data = get_data(session, query.build())
 
 
 # --- Constants ---
@@ -19,24 +26,6 @@ def normal_cdf(x: float, mean: float, std: float) -> float:
         return 1.0 if x <= mean else 0.0
     z = (x - mean) / std
     return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-
-
-# --- Data Loading ---
-@st.cache_data
-def load_data() -> pd.DataFrame:
-    return session.sql("""
-        SELECT 
-            MINUTE, 
-            KILLS, 
-            DEATHS, 
-            ASSISTS, 
-            COALESCE(ROUND(
-                (KILLS + ASSISTS) / NULLIF(DEATHS, 0)
-            , 2), KILLS + ASSISTS) AS KDA_RATIO
-        FROM LEAGUE_RECORDS_LEGACY.L30_ID.FCT_INTERVALS
-        JOIN LEAGUE_RECORDS_LEGACY.L30_ID.DIM_INTERVALS_KDA USING(PLAYER_INTERVAL_ID)
-        ORDER BY MINUTE ASC
-    """).to_pandas()
 
 
 # --- Core Logic ---
@@ -121,7 +110,6 @@ with st.expander("Sampling Parameters (Group Probability)"):
         n_runs = st.slider("Number of Runs", min_value=100, max_value=50000, value=10000, step=100)
 
 # --- Load and Filter ---
-data = load_data()
 arr = prep_arr(data, minute, stat)
 
 if len(arr) == 0:
