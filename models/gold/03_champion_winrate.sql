@@ -1,122 +1,142 @@
 USE DATABASE LEAGUE_RECORDS;
 USE SCHEMA GOLD;
+
+
 -------------------------------------------------------------------------------------------
-    -- CHAMPION_OVERVIEW: Champion-level pick rate, win rate, ban rate, and primary lane
-    --
-    -- GRAIN: One row per CHAMPION.
-    --
-    -- DESIGN NOTES:
-    -- 1. MOST_PICKED_LANE is METADATA, not a filter. GLOBAL_PICK_RATE / GLOBAL_WIN_RATE are
-    --    computed GLOBALLY across all lanes that champion has been played in -- column
-    --    names are prefixed GLOBAL_ to make this explicit. MOST_PICKED_LANE only labels
-    --    which lane that champion is most commonly played in, and LANE_PICK_RATE shows
-    --    what share of that champion's total picks happened in that specific lane.
-    -- 2. GLOBAL_BAN_RATE is inherently champion-wide -- bans happen during champion select,
-    --    before lanes are assigned, so there is no lane-scoped version of this stat.
+-- CHAMPION_OVERVIEW: Champion-level pick rate, win rate, ban rate, and primary lane
+--
+-- GRAIN: One row per champion in CHAMPIONS_REF_SILVER (excluding 'No Champion', id=0)
+--
+-- DESIGN NOTES:
+--    1. Remakes (GAME_DURATION < 300s) are excluded.
 -------------------------------------------------------------------------------------------
--- CREATE OR REPLACE DYNAMIC TABLE CHAMPION_OVERVIEW
--- TARGET_LAG = '1 day'
--- WAREHOUSE = COMPUTE_WH
--- COMMENT = 'Champion-level pick rate, win rate, ban rate, and primary lane. MOST_PICKED_LANE/LANE_PICK_RATE are metadata about that champions most common lane -- they do not filter GLOBAL_PICK_RATE/GLOBAL_WIN_RATE/GLOBAL_BAN_RATE, which are global across all lanes.'
--- AS
-WITH PLAYER_MATCH AS (
+CREATE OR REPLACE DYNAMIC TABLE CHAMPION_OVERVIEW
+TARGET_LAG = '1 day'
+WAREHOUSE = COMPUTE_WH
+COMMENT = 'Champion-level pick/win/ban rate and primary lane.'
+AS
+-- Exclude remake games from being treated as fair win resolve. 
+WITH NO_REMAKE_MATCHES AS (
+    SELECT *
+    FROM SILVER.MATCHES_SUMMARY_SILVER
+    WHERE GAME_DURATION >= 300
+),
+
+PLAYER_MATCH AS (
     SELECT
-        PS.CHAMPION,
+    -- Only naming inconsistency from source data
+        CASE 
+            WHEN PS.CHAMPION = 'Fiddle Sticks' THEN 'Fiddlesticks' 
+            ELSE PS.CHAMPION 
+        END AS CHAMPION,
         PS.LANE,
         (PS.TEAM = MAT.WINNING_TEAM) AS WIN
-    FROM SILVER.MATCHES_SUMMARY_SILVER AS MAT
+    FROM NO_REMAKE_MATCHES AS MAT
     JOIN SILVER.PLAYERS_SUMMARY_SILVER AS PS
         ON PS.MATCH_ID = MAT.MATCH_ID
+    -- Excludes rows with no resolvable winner.
+    WHERE (PS.TEAM = MAT.WINNING_TEAM) IS NOT NULL
 ),
--- Global per champion pick/win counts
+-- Global pick/win counts per champion (across all lanes), keyed on name.
 CHAMPION_GLOBAL_STATS AS (
     SELECT
         CHAMPION,
-        COUNT(*) AS GAMES_PLAYED,
+        COUNT(*) AS GLOBAL_GAMES_PLAYED,
         SUM(CASE WHEN WIN THEN 1 ELSE 0 END) AS WINS
     FROM PLAYER_MATCH
     GROUP BY CHAMPION
 ),
--- Global most-played lane per champion, with that lane's share of total picks
+-- Most-played lane per champion + that lane's share of the champion's total picks.
+-- The LANE tiebreaker is for when two lanes are exactly even.
 PRIMARY_LANE AS (
     SELECT
         CHAMPION,
         LANE AS MOST_PICKED_LANE,
         ROUND(
-            COUNT(*) / SUM(COUNT(*)) OVER(PARTITION BY CHAMPION)::FLOAT
-        , 4) AS LANE_PICK_RATE
+            COUNT(*) / 
+            SUM(COUNT(*)) OVER (PARTITION BY CHAMPION)::FLOAT
+        , 4) AS PRIMARY_LANE_SHARE
     FROM PLAYER_MATCH
     GROUP BY CHAMPION, LANE
     QUALIFY ROW_NUMBER() OVER (
         PARTITION BY CHAMPION
-        ORDER BY COUNT(*) DESC
+        ORDER BY COUNT(*) DESC, LANE
     ) = 1
 ),
+
 ALL_BANS AS (
-   SELECT DISTINCT
-        AB.MATCH_ID,
-        CR.CHAMPION_NAME AS CHAMPION
+    SELECT DISTINCT MATCH_ID, CHAMPION_ID
     FROM (
         SELECT
             MATCH_ID,
             BAN_ID.VALUE::NUMBER AS CHAMPION_ID
-        FROM SILVER.MATCHES_SUMMARY_SILVER,
-            LATERAL SPLIT_TO_TABLE(BLUE_BANS, ',') AS BAN_ID
+        FROM NO_REMAKE_MATCHES,
+            LATERAL SPLIT_TO_TABLE(
+            BLUE_BANS || ',' || RED_BANS
+            , ',') AS BAN_ID
         WHERE BAN_ID.VALUE != '0'
-
-        UNION ALL
-
-        SELECT
-            MATCH_ID,
-            BAN_ID.VALUE::NUMBER AS CHAMPION_ID
-        FROM SILVER.MATCHES_SUMMARY_SILVER,
-            LATERAL SPLIT_TO_TABLE(RED_BANS, ',') AS BAN_ID
-        WHERE BAN_ID.VALUE != '0'
-    ) AS AB
-    JOIN SILVER.CHAMPIONS_REF_SILVER AS CR
-        ON CR.CHAMPION_ID = AB.CHAMPION_ID
+    )
 ),
+
 BAN_COUNTS AS (
-    SELECT
-        CHAMPION,
-        COUNT(*) AS GAMES_BANNED
+    SELECT CHAMPION_ID, COUNT(*) AS GAMES_BANNED
     FROM ALL_BANS
-    GROUP BY CHAMPION
+    GROUP BY CHAMPION_ID
 ),
-CHAMPION_OVERVIEW_FINAL AS (
+
+TOTAL_MATCHES AS (
+    SELECT COUNT(*) AS TOTAL_GAMES
+    FROM NO_REMAKE_MATCHES
+),
+
+CHAMPION_AGGS AS (
     SELECT
-        CGS.CHAMPION,
+        -- Key
+        CR.CHAMPION_ID,
+        -- Descriptors
+        CR.CHAMPION_NAME,
         PL.MOST_PICKED_LANE,
-        PL.LANE_PICK_RATE,
-        CGS.GAMES_PLAYED,
-        ROUND(CGS.GAMES_PLAYED / TM.TOTAL_GAMES::FLOAT, 4)              AS GLOBAL_PICK_RATE,
-        ROUND(CGS.WINS / CGS.GAMES_PLAYED::FLOAT, 4)                    AS GLOBAL_WIN_RATE,
-        ROUND(COALESCE(BC.GAMES_BANNED, 0) / TM.TOTAL_GAMES::FLOAT, 4)  AS GLOBAL_BAN_RATE
-    FROM CHAMPION_GLOBAL_STATS AS CGS
-    JOIN PRIMARY_LANE AS PL
-        ON PL.CHAMPION = CGS.CHAMPION
+        PL.PRIMARY_LANE_SHARE,
+        -- Global rates
+        COALESCE(CGS.GLOBAL_GAMES_PLAYED, 0) AS GLOBAL_GAMES_PLAYED,
+        ROUND(
+            COALESCE(CGS.GLOBAL_GAMES_PLAYED, 0) / 
+            TM.TOTAL_GAMES::FLOAT
+        , 4) AS GLOBAL_PICK_RATE,
+        ROUND(
+            CGS.WINS / 
+            CGS.GLOBAL_GAMES_PLAYED::FLOAT
+        , 4) AS GLOBAL_WIN_RATE,
+        ROUND(
+            COALESCE(BC.GAMES_BANNED, 0) / 
+            TM.TOTAL_GAMES::FLOAT
+        , 4) AS GLOBAL_BAN_RATE
+    FROM SILVER.CHAMPIONS_REF_SILVER AS CR
+    LEFT JOIN CHAMPION_GLOBAL_STATS AS CGS
+        ON CGS.CHAMPION = CR.CHAMPION_NAME
+    LEFT JOIN PRIMARY_LANE AS PL
+        ON PL.CHAMPION = CR.CHAMPION_NAME
     LEFT JOIN BAN_COUNTS AS BC
-        ON BC.CHAMPION = CGS.CHAMPION
-    CROSS JOIN (SELECT COUNT(*) AS TOTAL_GAMES FROM SILVER.MATCHES_SUMMARY_SILVER) AS TM
+        ON BC.CHAMPION_ID = CR.CHAMPION_ID
+    CROSS JOIN TOTAL_MATCHES AS TM
 )
-
+-- Exclude 'No Champions' (CHAMPION_ID = 0) from the final presentation
 SELECT *
-FROM CHAMPION_OVERVIEW_FINAL
-
+FROM CHAMPION_AGGS
+WHERE CHAMPION_ID != 0 
 ;
 
--- Column-level comments
--- COMMENT ON COLUMN CHAMPION_OVERVIEW.MOST_PICKED_LANE IS
--- 'Metadata label: the lane this champion is most commonly played in. Does NOT filter GLOBAL_PICK_RATE/GLOBAL_WIN_RATE/GLOBAL_BAN_RATE, which are global across all lanes.';
+COMMENT ON COLUMN CHAMPION_OVERVIEW.MOST_PICKED_LANE IS
+'The lane this champion is most commonly played in.';
 
--- COMMENT ON COLUMN CHAMPION_OVERVIEW.LANE_PICK_RATE IS
--- 'Share of this champions total picks that occurred in MOST_PICKED_LANE specifically (lane games / champion total games). Companion metric to MOST_PICKED_LANE.';
+COMMENT ON COLUMN CHAMPION_OVERVIEW.PRIMARY_LANE_SHARE IS
+'Share of this champions total picks that occurred in MOST_PICKED_LANE.';
 
--- COMMENT ON COLUMN CHAMPION_OVERVIEW.GLOBAL_PICK_RATE IS
--- 'GAMES_PLAYED / total matches in dataset. Global across all lanes, not scoped to MOST_PICKED_LANE.';
+COMMENT ON COLUMN CHAMPION_OVERVIEW.GLOBAL_PICK_RATE IS
+'GAMES_PLAYED / total matches in dataset.';
 
--- COMMENT ON COLUMN CHAMPION_OVERVIEW.GLOBAL_WIN_RATE IS
--- 'Win rate across all games this champion was played, global across all lanes, not scoped to MOST_PICKED_LANE.';
+COMMENT ON COLUMN CHAMPION_OVERVIEW.GLOBAL_WIN_RATE IS
+'Win rate across all games this champion was played, global across all lanes.';
 
--- COMMENT ON COLUMN CHAMPION_OVERVIEW.GLOBAL_BAN_RATE IS
--- 'Games this champion was banned (either team) / total matches in dataset. Inherently champion-wide -- bans occur before lane assignment.';
+COMMENT ON COLUMN CHAMPION_OVERVIEW.GLOBAL_BAN_RATE IS
+'Games this champion was banned (either team) / total matches in dataset.';

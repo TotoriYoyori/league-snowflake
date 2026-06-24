@@ -8,10 +8,10 @@ USE SCHEMA GOLD;
     -- KNOWN LIMITATIONS:
     -- 1. "End of match" stats (KILLS/DEATHS/ASSISTS/CS/TOTAL_GOLD/ITEM_BUILD/LEVEL) reflect
     --    the LAST LOGGED INTERVAL, not the literal game-end state. Source data is sampled
-    --    every 5 minutes, so depending on when a match actually ended relative to the nearest
-    --    5-minute checkpoint, up to ~4-5 minutes of late-game state (item purchases, kills,
-    --    gold gain) may be missing. This is a source-data sampling limitation
-    -- 2. ITEM_BUILD preserves duplicate items (e.g. 2x Control Ward, 2x Infinity Edge).DESC
+    --    every 5 minutes, so up to ~4-5 minutes of unrecorded state (item purchases, kills,
+    --    gold gain) may be missing between last logged interval and actual end time. 
+    --    This is a source-data sampling limitation
+    -- 2. ITEM_BUILD preserves duplicate items (e.g. 2x Control Ward, 2x Infinity Edge).
     -- 3. ITEM_BUILD is ARRAY_SORT'ed alphabetically by item name.
     --
     -- FUTURE IMPROVEMENTS:
@@ -24,7 +24,8 @@ TARGET_LAG = '1 day'
 WAREHOUSE = COMPUTE_WH    
 COMMENT = 'One end game player stat per (MATCH_ID, PARTICIPANT_POS_ID). 
 KNOWN LIMITATION: end-of-match stats reflect the last logged 5-minute interval, 
-not literal game-end state -- may undercount late-game item builds, kills, gold by up to ~5 minutes of unlogged activity.'
+not literal game-end state -- may undercount late-game item builds, kills, gold by up to 
+~5 minutes of unlogged activity.'
 AS
 
 WITH MATCH_STATS_AT_END AS (
@@ -43,8 +44,7 @@ WITH MATCH_STATS_AT_END AS (
         PIV.TOTAL_GOLD,
         -- Build (A->Z sorted)
         ARRAY_SORT(ARRAY_CONSTRUCT_COMPACT(
-            PIV.ITEM_0, PIV.ITEM_1, PIV.ITEM_2, PIV.ITEM_3,
-            PIV.ITEM_4, PIV.ITEM_5, PIV.ITEM_6
+            PIV.ITEM_0, PIV.ITEM_1, PIV.ITEM_2, PIV.ITEM_3, PIV.ITEM_4, PIV.ITEM_5, PIV.ITEM_6
         )) AS ITEM_BUILD
     FROM SILVER.PLAYER_INTERVAL_SILVER AS PIV
     QUALIFY ROW_NUMBER() OVER (
