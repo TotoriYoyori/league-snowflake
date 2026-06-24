@@ -5,35 +5,21 @@ USE SCHEMA SILVER;
     -- 1. CLEANING VIEW
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW SILVER.ITEMS_REF_BRONZE_STM_TO_SILVER AS
-WITH cleaned AS (
-    SELECT
-        ITEM_ID,
-        -- Captures item name from HTML-wrapped entries, e.g.:
-        -- '<rarityLegendary>Death's Daughter</rarityLegendary><br>...' --> 'Death's Daughter'
-        TRIM(
-            CASE
-                WHEN ITEM_NAME LIKE '%<rarityLegendary>%'
-                    THEN REGEXP_SUBSTR(ITEM_NAME, '<rarityLegendary>(.*?)</rarityLegendary>', 1, 1, 'e')
-                ELSE ITEM_NAME
-            END
-        ) AS ITEM_NAME
-    FROM BRONZE.ITEMS_REF_BRONZE_STM
-)
--- Deduplicate items (same name, multiple IDs → keep smallest ID)
 SELECT
     ITEM_ID,
-    ITEM_NAME
-FROM cleaned
-QUALIFY ITEM_NAME IS NULL
-    OR ROW_NUMBER() OVER (PARTITION BY ITEM_NAME ORDER BY ITEM_ID ASC) = 1;
+    TRIM(ITEM_NAME) AS ITEM_NAME,
+    ITEM_CATEGORY
+FROM BRONZE.ITEMS_REF_BRONZE_STM
+;
 
 
 -------------------------------------------------------------------------------------------
     -- 2. SILVER TABLE: One row per item. PK on ITEM_ID.
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TABLE SILVER.ITEMS_REF_SILVER (
-    ITEM_ID    NUMBER(38,0) NOT NULL,
-    ITEM_NAME  VARCHAR(255),
+    ITEM_ID       NUMBER(38,0) NOT NULL,
+    ITEM_NAME     VARCHAR(255),
+    ITEM_CATEGORY VARCHAR(255),
     
     CONSTRAINT ITEMS_REF_SILVER_PKEY PRIMARY KEY (ITEM_ID)
 )
@@ -56,10 +42,11 @@ USING (
 ) AS src
     ON tgt.ITEM_ID = src.ITEM_ID
 WHEN MATCHED THEN
-    UPDATE SET tgt.ITEM_NAME = src.ITEM_NAME
+    UPDATE SET tgt.ITEM_NAME = src.ITEM_NAME,
+               tgt.ITEM_CATEGORY = src.ITEM_CATEGORY
 WHEN NOT MATCHED THEN
-    INSERT (ITEM_ID, ITEM_NAME)
-    VALUES (src.ITEM_ID, src.ITEM_NAME);
+    INSERT (ITEM_ID, ITEM_NAME, ITEM_CATEGORY)
+    VALUES (src.ITEM_ID, src.ITEM_NAME, src.ITEM_CATEGORY);
 
 -------------------------------------------------------------------------------------------
     -- 4. CLEANING VIEW: Split PascalCase champion names into Title Case, trim
@@ -106,4 +93,5 @@ WHEN MATCHED THEN
     UPDATE SET tgt.CHAMPION_NAME = src.CHAMPION_NAME
 WHEN NOT MATCHED THEN
     INSERT (CHAMPION_ID, CHAMPION_NAME)
-    VALUES (src.CHAMPION_ID, src.CHAMPION_NAME);
+    VALUES (src.CHAMPION_ID, src.CHAMPION_NAME)
+;

@@ -16,7 +16,7 @@ USE SCHEMA GOLD;
     --
     -- FUTURE IMPROVEMENTS:
     -- - If/when an end-of-match participant snapshot becomes available from the data source
-    --   (separate from the timeline/interval endpoint), prefer that for "final build" and
+    --   (separate from the timeline/interval endpoint), prefer that for final build and
     --   final KDA/gold specifically, and keep interval data only for time-series analysis.
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE GOLD.PLAYER_STATS_BASE

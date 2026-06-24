@@ -5,8 +5,9 @@ USE SCHEMA BRONZE;
     -- 1. BRONZE TABLE: Items reference lookup
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TABLE BRONZE.ITEMS_REF_BRONZE (
-    ITEM_ID    NUMBER(38,0) NOT NULL,
-    ITEM_NAME  VARCHAR(255),
+    ITEM_ID       NUMBER(38,0) NOT NULL,
+    ITEM_NAME     VARCHAR(255),
+    ITEM_CATEGORY VARCHAR(255),
     -- Load Metadata
     LDTS            TIMESTAMP_NTZ(9) NOT NULL,
     FILE_NAME       VARCHAR(255) NOT NULL,
@@ -45,6 +46,7 @@ FROM (
     SELECT
         $1,  -- item_id
         $2,  -- item_name
+        $3,  -- item_category
         CURRENT_TIMESTAMP(),
         METADATA$FILENAME,
         METADATA$FILE_ROW_NUMBER,

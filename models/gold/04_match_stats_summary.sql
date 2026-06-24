@@ -15,6 +15,7 @@ WAREHOUSE = COMPUTE_WH
 COMMENT = 'Match-grain summary of final team stats (kills, towers, dragons, void grubs, heralds, barons, gold diff) 
 and match context (duration, date, winner, average rank).'
 AS
+
 WITH TEAM_FINAL AS (
     SELECT 
         MATCH_ID,

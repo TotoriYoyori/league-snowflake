@@ -81,14 +81,15 @@ COMMENT = 'Source match intervals dataset. One record --> One row per player per
 
 
 -------------------------------------------------------------------------------------------
-    -- 4. SEED_ITEMS_REF: Item ID to name lookup
+    -- 4. SEED_ITEMS_REF_CLASSIFIED: Item ID to name lookup, ALONG WITH CLASSIFICATIONS
+    -- SEED_ITEMS_REF IS OUTDATED. 
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TABLE SEED.SEED_ITEMS_REF (
-    ITEM_ID    NUMBER(38,0) NOT NULL,
-    ITEM_NAME  VARCHAR(255)
+    ITEM_ID       NUMBER(38,0) NOT NULL,
+    ITEM_NAME     VARCHAR(255),
+    ITEM_CATEGORY VARCHAR(255)
 )
-COMMENT = 'Source item reference lookup. One record --> One item.';
-
+COMMENT = 'Source item reference lookup. One record --> One item and its categorization.';
 
 -------------------------------------------------------------------------------------------
     -- 5. SEED_CHAMPIONS_REF: Champion ID to name lookup
