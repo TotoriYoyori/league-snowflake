@@ -1,30 +1,36 @@
 USE DATABASE LEAGUE_RECORDS;
 USE SCHEMA GOLD;
 -------------------------------------------------------------------------------------------
-    -- MATCH_STATS_SUMMARY: Match-grain summary. 
+-- MATCH_STATS_SUMMARY: Match-grain summary of final team stats and match context.
+--
+-- GRAIN: One row per MATCH_ID, including remakes/unfinished games. 
+--
+-- DESIGN NOTES:
+-- 1. WINNING_GOLD_DIFF reports the gold differential of whichever team won, so it's always
+--    framed as "the winner's gold lead" rather than "blue's gold lead." 
 -------------------------------------------------------------------------------------------
+CREATE OR REPLACE DYNAMIC TABLE MATCH_STATS_SUMMARY
+TARGET_LAG = '5 minutes'
+WAREHOUSE = COMPUTE_WH
+COMMENT = 'Match-grain summary of final team stats (kills, towers, dragons, void grubs, heralds, barons, gold diff) 
+and match context (duration, date, winner, average rank).'
+AS
 WITH TEAM_FINAL AS (
     SELECT 
-        -- Primary key
-        TI.MATCH_ID,
-        TI.TEAM,
-        -- Stats
-        TI.TEAM_KILLS,
-        TI.TEAM_TOWERS,
-        TI.TEAM_DRAGONS,
-        TI.TEAM_VOID_GRUBS,
-        TI.TEAM_HERALDS,
-        TI.TEAM_BARONS,
-        TI.TEAM_GOLD_DIFF,
-    FROM SILVER.TEAM_INTERVAL_SILVER AS TI
-    ---- Capture only the last minute interval per match --> A match's final statistics
-    JOIN (
-        SELECT MATCH_ID, MAX(MINUTE) AS MINUTE
-        FROM SILVER.TEAM_INTERVAL_SILVER
-        GROUP BY MATCH_ID
-    ) AS LM 
-        ON LM.MATCH_ID = TI.MATCH_ID
-        AND LM.MINUTE = TI.MINUTE
+        MATCH_ID,
+        TEAM,
+        TEAM_KILLS,
+        TEAM_TOWERS,
+        TEAM_DRAGONS,
+        TEAM_VOID_GRUBS,
+        TEAM_HERALDS,
+        TEAM_BARONS,
+        TEAM_GOLD_DIFF
+    FROM SILVER.TEAM_INTERVAL_SILVER
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY MATCH_ID, TEAM
+        ORDER BY MINUTE DESC
+    ) = 1
 ),
 
 PIVOT_TEAM_STATS AS (
@@ -47,27 +53,14 @@ PIVOT_TEAM_STATS AS (
     GROUP BY MATCH_ID
 ),
 
-WINNING_GOLD_DIFF_CTE AS (
+MATCH_STATS_SUMMARY_CTE AS (
     SELECT 
-        P.MATCH_ID,
-        -- Keep only the gold diff of the winning team to report
-        CASE 
-            WHEN M.WINNING_TEAM = 'Blue' THEN P.BLUE_GOLD_DIFF
-            WHEN M.WINNING_TEAM = 'Red'  THEN P.RED_GOLD_DIFF
-        END AS WINNING_GOLD_DIFF
-    FROM PIVOT_TEAM_STATS AS P
-    JOIN SILVER.MATCHES_SUMMARY_SILVER AS M
-        ON P.MATCH_ID = M.MATCH_ID
-),
-
-WITH_MATCH_SUMMARY AS (
-    SELECT 
-        -- Primary Key
+        -- Primary key
         P.MATCH_ID,
         -- Context
         M.GAME_DURATION,
         M.GAME_DATE,
-        M.WINNING_TEAM,        
+        M.WINNING_TEAM,
         M.AVERAGE_RANK,
         -- Stats
         P.BLUE_KILLS,
@@ -82,16 +75,21 @@ WITH_MATCH_SUMMARY AS (
         P.RED_HERALDS,
         P.BLUE_BARONS,
         P.RED_BARONS,
-        W.WINNING_GOLD_DIFF
+        -- Gold diff of the winning team only; NULL when WINNING_TEAM isn't 'Blue'/'Red'
+        -- (e.g. an unresolved/remade match with no clean winner).
+        CASE 
+            WHEN M.WINNING_TEAM = 'Blue' THEN P.BLUE_GOLD_DIFF
+            WHEN M.WINNING_TEAM = 'Red'  THEN P.RED_GOLD_DIFF
+        END AS WINNING_GOLD_DIFF
     FROM PIVOT_TEAM_STATS AS P
     JOIN SILVER.MATCHES_SUMMARY_SILVER AS M
         ON P.MATCH_ID = M.MATCH_ID
-    JOIN WINNING_GOLD_DIFF_CTE AS W
-        ON P.MATCH_ID = W.MATCH_ID
 )
 
 SELECT *
-FROM WITH_MATCH_SUMMARY
-WHERE WINNING_GOLD_DIFF < 0
-ORDER BY GAME_DATE DESC
+FROM MATCH_STATS_SUMMARY_CTE
 ;
+
+-- Column-level comments
+COMMENT ON COLUMN MATCH_STATS_SUMMARY.WINNING_GOLD_DIFF IS
+'Gold differential of the WINNING_TEAM specifically (not Blue''s gold diff) at the final recorded minute. NULL if WINNING_TEAM is not exactly Blue or Red.';
