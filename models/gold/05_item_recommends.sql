@@ -5,67 +5,114 @@ USE SCHEMA GOLD;
 --     TARGET_LAG = '1 hour'
 --     WAREHOUSE = COMPUTE_WH
 -- AS
-WITH MATCH_LAST_INTERVAL AS (
-    SELECT MATCH_ID, MAX(MINUTE) AS END_INTERVAL
+WITH LAST_PLAYER_INTERVAL AS (
+    SELECT *
     FROM SILVER.PLAYER_INTERVAL_SILVER
-    GROUP BY MATCH_ID
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY MATCH_ID, PARTICIPANT_POS_ID
+        ORDER BY MINUTE DESC
+    ) = 1
 ),
 
 FINAL_SNAPSHOT AS (
     SELECT
-        ML.MATCH_ID,
-        PIV.PARTICIPANT_POS_ID,
-        PIV.KILLS, PIV.DEATHS, PIV.ASSISTS,
-        PIV.ITEM_0, PIV.ITEM_1, PIV.ITEM_2, PIV.ITEM_3,
-        PIV.ITEM_4, PIV.ITEM_5, PIV.ITEM_6,
-        (PS.TEAM = MAT.WINNING_TEAM) AS WIN
-    FROM MATCH_LAST_INTERVAL AS ML
-    JOIN SILVER.PLAYER_INTERVAL_SILVER AS PIV
-        ON PIV.MATCH_ID = ML.MATCH_ID
-        AND PIV.MINUTE = ML.END_INTERVAL
+        LPI.MATCH_ID,
+        LPI.PARTICIPANT_POS_ID,
+        LPI.KILLS, LPI.DEATHS, LPI.ASSISTS,
+        ARRAY_CONSTRUCT_COMPACT(
+            LPI.ITEM_0, LPI.ITEM_1, LPI.ITEM_2, LPI.ITEM_3, LPI.ITEM_4, LPI.ITEM_5, LPI.ITEM_6
+        ) AS ITEM_BUILD,
+        (PS.TEAM = MAT.WINNING_TEAM) AS WIN,
+        PS.CHAMPION
+    FROM LAST_PLAYER_INTERVAL AS LPI
     JOIN SILVER.MATCHES_SUMMARY_SILVER AS MAT
-        ON MAT.MATCH_ID = ML.MATCH_ID
+        ON MAT.MATCH_ID = LPI.MATCH_ID
     JOIN SILVER.PLAYERS_SUMMARY_SILVER AS PS
-        ON PS.MATCH_ID = ML.MATCH_ID
-        AND PS.PARTICIPANT_POS_ID = PIV.PARTICIPANT_POS_ID
+        ON PS.MATCH_ID = LPI.MATCH_ID
+        AND PS.PARTICIPANT_POS_ID = LPI.PARTICIPANT_POS_ID
 ),
 
+-------------------------------------------------------------------------------------------
+    -- LATERAL FLATTEN done as its own step (not on the left side of a subsequent JOIN
+    -- -- see prior fix note). Reference table is joined afterward in PLAYER_ITEMS.
+-------------------------------------------------------------------------------------------
+FLATTENED_ITEMS AS (
+    SELECT
+        FS.MATCH_ID,
+        FS.PARTICIPANT_POS_ID,
+        FS.KILLS, FS.DEATHS, FS.ASSISTS, FS.WIN, FS.CHAMPION,
+        ITEM.VALUE::VARCHAR AS ITEM_NAME
+    FROM FINAL_SNAPSHOT AS FS,
+        LATERAL FLATTEN(INPUT => FS.ITEM_BUILD) AS ITEM
+),
+
+-------------------------------------------------------------------------------------------
+    -- PLAYER_ITEMS: join category onto flattened rows, exclude Other/Legacy/Distributed
+    -- (not real recommendable shop tiers), and attach a numeric TIER_RANK encoding the
+    -- LoL item-upgrade hierarchy (low -> high):
+    --   1 Trinket, 2 Consumable, 3 Starter, 4 Basic, 5 Boots, 6 Epic, 7 Legendary
+    -- TIER_RANK drives CO_OCCURRENCE below: an item only recommends alongside items of
+    -- the SAME rank or HIGHER (e.g. Basic recommends Basic/Boots/Epic/Legendary, but
+    -- Legendary -- the top of the pipeline -- only recommends other Legendaries).
+-------------------------------------------------------------------------------------------
 PLAYER_ITEMS AS (
-    SELECT DISTINCT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_NAME
-    FROM (
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_0 AS ITEM_NAME FROM FINAL_SNAPSHOT WHERE ITEM_0 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_1 FROM FINAL_SNAPSHOT WHERE ITEM_1 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_2 FROM FINAL_SNAPSHOT WHERE ITEM_2 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_3 FROM FINAL_SNAPSHOT WHERE ITEM_3 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_4 FROM FINAL_SNAPSHOT WHERE ITEM_4 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_5 FROM FINAL_SNAPSHOT WHERE ITEM_5 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, KILLS, DEATHS, ASSISTS, WIN, ITEM_6 FROM FINAL_SNAPSHOT WHERE ITEM_6 IS NOT NULL
-    )
+    SELECT
+        FI.MATCH_ID,
+        FI.PARTICIPANT_POS_ID,
+        FI.KILLS, FI.DEATHS, FI.ASSISTS, FI.WIN, FI.CHAMPION,
+        FI.ITEM_NAME,
+        IR.ITEM_CATEGORY,
+        CASE IR.ITEM_CATEGORY
+            WHEN 'Trinket'    THEN 1
+            WHEN 'Consumable' THEN 2
+            WHEN 'Starter'    THEN 3
+            WHEN 'Basic'      THEN 4
+            WHEN 'Boots'      THEN 5
+            WHEN 'Epic'       THEN 6
+            WHEN 'Legendary'  THEN 7
+        END AS TIER_RANK
+    FROM FLATTENED_ITEMS AS FI
+    LEFT JOIN SILVER.ITEMS_REF_SILVER AS IR
+        ON IR.ITEM_NAME = FI.ITEM_NAME
+    WHERE IR.ITEM_CATEGORY NOT IN ('Other', 'Legacy', 'Distributed')
 ),
 
 ITEM_STATS AS (
     SELECT
+        CHAMPION,
         ITEM_NAME,
+        ITEM_CATEGORY,
         COUNT(*)                                                AS PLAYERS_PURCHASED,
         SUM(IFF(WIN, 1, 0))                                      AS WINS_WITH_ITEM,
-        ROUND(AVG((KILLS + ASSISTS) / GREATEST(DEATHS, 1)), 2)   AS AVG_KDA
+        ROUND(AVG((KILLS + ASSISTS) / (DEATHS + 1)), 2)          AS AVG_KDA
     FROM PLAYER_ITEMS
-    GROUP BY ITEM_NAME
+    GROUP BY CHAMPION, ITEM_NAME, ITEM_CATEGORY
 ),
 
-TOTAL_PLAYERS AS (
-    SELECT COUNT(*) AS TOTAL_PLAYER_MATCHES
-    FROM SILVER.PLAYERS_SUMMARY_SILVER
+-- Denominator now scoped per champion: "player-matches ON THIS CHAMPION with interval data."
+TOTAL_PLAYERS_BY_CHAMPION AS (
+    SELECT FS.CHAMPION, COUNT(*) AS TOTAL_PLAYER_MATCHES
+    FROM FINAL_SNAPSHOT AS FS
+    GROUP BY FS.CHAMPION
 ),
--- Half-volume self-join: only compute each unordered pair once (A < B)
+
+-------------------------------------------------------------------------------------------
+    -- CO_OCCURRENCE: tier-hierarchy self-join, NOT a simple half-volume dedupe anymore.
+    --
+    -- Why this can't reuse the old "A.ITEM_NAME < B.ITEM_NAME" half-volume trick:
+    -- that trick relied on the relationship being symmetric (same-category equality --
+    -- if A pairs with B, B pairs with A, so compute once and mirror). Tier-hierarchy
+    -- is NOT symmetric: Doran's Blade (Starter, rank 3) should recommend Infinity Edge
+    -- (Legendary, rank 7), but Infinity Edge should NOT recommend Doran's Blade back --
+    -- Legendary only recommends Legendary. So instead of one inequality, every ORDERED
+    -- pair within a match/player/champion is computed once via A.ITEM_NAME != B.ITEM_NAME,
+    -- and the tier filter (B.TIER_RANK >= A.TIER_RANK) determines which direction is
+    -- kept. This computes the full N^2 ordered-pair volume per build rather than half --
+    -- builds only have up to ~6-7 items, so this is not a meaningful cost increase.
+-------------------------------------------------------------------------------------------
 CO_OCCURRENCE AS (
     SELECT
+        A.CHAMPION,
         A.ITEM_NAME AS ITEM,
         B.ITEM_NAME AS CO_ITEM,
         COUNT(*)    AS CO_PURCHASE_COUNT
@@ -73,72 +120,80 @@ CO_OCCURRENCE AS (
     JOIN PLAYER_ITEMS B
         ON A.MATCH_ID = B.MATCH_ID
         AND A.PARTICIPANT_POS_ID = B.PARTICIPANT_POS_ID
-        AND A.ITEM_NAME < B.ITEM_NAME
-    GROUP BY A.ITEM_NAME, B.ITEM_NAME
+        AND A.CHAMPION = B.CHAMPION
+        AND A.ITEM_NAME != B.ITEM_NAME
+        AND B.TIER_RANK >= A.TIER_RANK   -- B is same tier or higher than A
+    GROUP BY A.CHAMPION, A.ITEM_NAME, B.ITEM_NAME
 ),
--- Re-expand to both directions (cheap now: operates on aggregated pairs, not raw rows)
-CO_OCCURRENCE_BOTH_DIRECTIONS AS (
-    SELECT ITEM, CO_ITEM, CO_PURCHASE_COUNT FROM CO_OCCURRENCE
-    UNION ALL
-    SELECT CO_ITEM AS ITEM, ITEM AS CO_ITEM, CO_PURCHASE_COUNT FROM CO_OCCURRENCE
-),
+
+-------------------------------------------------------------------------------------------
+    -- No "BOTH_DIRECTIONS" union here -- CO_OCCURRENCE above is already the complete,
+    -- correctly-directional set (every ITEM only ever lists CO_ITEMs of >= its own
+    -- tier). Mirroring it would reintroduce the symmetry we just removed (it would
+    -- put Starter items back into Legendary's recommendation list).
+-------------------------------------------------------------------------------------------
 RANKED_CO_OCCURRENCE AS (
     SELECT
-        ITEM, CO_ITEM,
+        CHAMPION, ITEM, CO_ITEM,
         ROW_NUMBER() OVER (
-            PARTITION BY ITEM ORDER BY CO_PURCHASE_COUNT DESC
+            PARTITION BY CHAMPION, ITEM ORDER BY CO_PURCHASE_COUNT DESC, CO_ITEM
         ) AS CO_RANK
-    FROM CO_OCCURRENCE_BOTH_DIRECTIONS
+    FROM CO_OCCURRENCE
     QUALIFY CO_RANK <= 3
 ),
 TOP3_WIDE AS (
     SELECT
-        ITEM,
+        CHAMPION, ITEM,
         MAX(IFF(CO_RANK = 1, CO_ITEM, NULL)) AS TOP_ITEM_1,
         MAX(IFF(CO_RANK = 2, CO_ITEM, NULL)) AS TOP_ITEM_2,
         MAX(IFF(CO_RANK = 3, CO_ITEM, NULL)) AS TOP_ITEM_3
     FROM RANKED_CO_OCCURRENCE
-    GROUP BY ITEM
+    GROUP BY CHAMPION, ITEM
 ),
--- First-purchase interval: scan every minute (not just the final snapshot) to find the
--- earliest MINUTE each item appears in any slot, per player-match.
+
+-------------------------------------------------------------------------------------------
+    -- First-purchase timing, scoped per champion. Same Other/Legacy/Distributed
+    -- exclusion applied here for consistency with PLAYER_ITEMS (tier hierarchy itself
+    -- doesn't affect this CTE -- it's a standalone per-item stat, not a pairwise one).
+-------------------------------------------------------------------------------------------
 ITEM_APPEARANCES AS (
-    SELECT DISTINCT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_NAME
-    FROM (
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_0 AS ITEM_NAME FROM SILVER.PLAYER_INTERVAL_SILVER WHERE ITEM_0 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_1 FROM SILVER.PLAYER_INTERVAL_SILVER WHERE ITEM_1 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_2 FROM SILVER.PLAYER_INTERVAL_SILVER WHERE ITEM_2 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_3 FROM SILVER.PLAYER_INTERVAL_SILVER WHERE ITEM_3 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_4 FROM SILVER.PLAYER_INTERVAL_SILVER WHERE ITEM_4 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_5 FROM SILVER.PLAYER_INTERVAL_SILVER WHERE ITEM_5 IS NOT NULL
-        UNION ALL
-        SELECT MATCH_ID, PARTICIPANT_POS_ID, MINUTE, ITEM_6 FROM SILVER.PLAYER_INTERVAL_SILVER WHERE ITEM_6 IS NOT NULL
-    )
+    SELECT
+        PI.MATCH_ID, PI.PARTICIPANT_POS_ID, PI.MINUTE,
+        ITEM.VALUE::VARCHAR AS ITEM_NAME
+    FROM SILVER.PLAYER_INTERVAL_SILVER AS PI,
+        LATERAL FLATTEN(INPUT => ARRAY_CONSTRUCT_COMPACT(
+            PI.ITEM_0, PI.ITEM_1, PI.ITEM_2, PI.ITEM_3, PI.ITEM_4, PI.ITEM_5, PI.ITEM_6
+        )) AS ITEM
 ),
 
 FIRST_PURCHASE AS (
-    SELECT MATCH_ID, PARTICIPANT_POS_ID, ITEM_NAME, MIN(MINUTE) AS FIRST_MINUTE
-    FROM ITEM_APPEARANCES
-    GROUP BY MATCH_ID, PARTICIPANT_POS_ID, ITEM_NAME
+    SELECT
+        IA.MATCH_ID, IA.PARTICIPANT_POS_ID, IA.ITEM_NAME,
+        PS.CHAMPION,
+        MIN(IA.MINUTE) AS FIRST_MINUTE
+    FROM ITEM_APPEARANCES AS IA
+    JOIN SILVER.PLAYERS_SUMMARY_SILVER AS PS
+        ON PS.MATCH_ID = IA.MATCH_ID
+        AND PS.PARTICIPANT_POS_ID = IA.PARTICIPANT_POS_ID
+    LEFT JOIN SILVER.ITEMS_REF_SILVER AS IR
+        ON IR.ITEM_NAME = IA.ITEM_NAME
+    WHERE IR.ITEM_CATEGORY NOT IN ('Other', 'Legacy', 'Distributed')
+    GROUP BY IA.MATCH_ID, IA.PARTICIPANT_POS_ID, IA.ITEM_NAME, PS.CHAMPION
 ),
 
 FIRST_PURCHASE_COUNTS AS (
-    SELECT ITEM_NAME, FIRST_MINUTE, COUNT(*) AS CNT
+    SELECT CHAMPION, ITEM_NAME, FIRST_MINUTE, COUNT(*) AS CNT
     FROM FIRST_PURCHASE
-    GROUP BY ITEM_NAME, FIRST_MINUTE
+    GROUP BY CHAMPION, ITEM_NAME, FIRST_MINUTE
 ),
 
 MOST_COMMON_FIRST_PURCHASE AS (
     SELECT
+        CHAMPION,
         ITEM_NAME,
         FIRST_MINUTE AS MOST_COMMON_FIRST_PURCHASE_MINUTE,
         ROW_NUMBER() OVER (
-            PARTITION BY ITEM_NAME ORDER BY CNT DESC
+            PARTITION BY CHAMPION, ITEM_NAME ORDER BY CNT DESC, FIRST_MINUTE
         ) AS FIRST_MINUTE_RANK
     FROM FIRST_PURCHASE_COUNTS
     QUALIFY FIRST_MINUTE_RANK = 1
@@ -146,7 +201,9 @@ MOST_COMMON_FIRST_PURCHASE AS (
 
 ITEM_STATS_FINAL AS (
     SELECT
+        IS_.CHAMPION,
         IS_.ITEM_NAME                                                          AS ITEM,
+        IS_.ITEM_CATEGORY,
         ROUND(IS_.PLAYERS_PURCHASED / TP.TOTAL_PLAYER_MATCHES::FLOAT, 4)       AS PLAYER_PURCHASE_RATE,
         ROUND(IS_.WINS_WITH_ITEM / IS_.PLAYERS_PURCHASED::FLOAT, 4)            AS WIN_RATE,
         IS_.AVG_KDA,
@@ -155,11 +212,16 @@ ITEM_STATS_FINAL AS (
         T3.TOP_ITEM_2,
         T3.TOP_ITEM_3
     FROM ITEM_STATS AS IS_
-    CROSS JOIN TOTAL_PLAYERS AS TP
-    LEFT JOIN TOP3_WIDE AS T3 ON T3.ITEM = IS_.ITEM_NAME
-    LEFT JOIN MOST_COMMON_FIRST_PURCHASE AS MCFP ON MCFP.ITEM_NAME = IS_.ITEM_NAME
+    JOIN TOTAL_PLAYERS_BY_CHAMPION AS TP
+        ON TP.CHAMPION = IS_.CHAMPION
+    LEFT JOIN TOP3_WIDE AS T3
+        ON T3.CHAMPION = IS_.CHAMPION AND T3.ITEM = IS_.ITEM_NAME
+    LEFT JOIN MOST_COMMON_FIRST_PURCHASE AS MCFP
+        ON MCFP.CHAMPION = IS_.CHAMPION AND MCFP.ITEM_NAME = IS_.ITEM_NAME
 )
 
 SELECT *
 FROM ITEM_STATS_FINAL
+WHERE CHAMPION = 'Sylas'
+ORDER BY PLAYER_PURCHASE_RATE DESC
 ;

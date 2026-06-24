@@ -165,4 +165,5 @@ SELECT
     i.TEAM_BARONS, i.TEAM_VOID_GRUBS, i.TEAM_HERALDS,
     i.GOLD_DIFF, i.XP_DIFF, i.TEAM_GOLD_DIFF
 FROM imputed i
-JOIN item_names n ON n.ID = i.ID;
+JOIN item_names n ON n.ID = i.ID
+;

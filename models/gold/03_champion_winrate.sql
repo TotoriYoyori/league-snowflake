@@ -14,6 +14,7 @@ CREATE OR REPLACE DYNAMIC TABLE CHAMPION_OVERVIEW
 TARGET_LAG = '1 day'
 WAREHOUSE = COMPUTE_WH
 COMMENT = 'Champion-level pick/win/ban rate and primary lane.'
+
 AS
 -- Exclude remake games from being treated as fair win resolve. 
 WITH NO_REMAKE_MATCHES AS (

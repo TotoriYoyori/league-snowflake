@@ -8,7 +8,7 @@
 --   matches_summary.csv      
 --   players_summary.csv      
 --   intervals.csv.gz          
---   items_ref.csv            
+--   items_ref.csv     
 --   champions_ref.csv        
 -------------------------------------------------------------------------------------------
 USE WAREHOUSE COMPUTE_WH;
@@ -66,7 +66,13 @@ FROM LEAGUE_RECORDS.SEED.SEED_CHAMPIONS_REF;
 -- 3. ONE-TIME: STAGE REFERENCE DATA AND REFRESH REFERENCE PIPES
 -------------------------------------------------------------------------------------------
 COPY INTO @LEAGUE_RECORDS.BRONZE.ITEMS_REF_STG/items_ref.csv
-FROM (SELECT ITEM_ID, ITEM_NAME FROM LEAGUE_RECORDS.SEED.SEED_ITEMS_REF)
+FROM (
+    SELECT 
+        ITEM_ID, 
+        ITEM_NAME, 
+        ITEM_CATEGORY 
+    FROM LEAGUE_RECORDS.SEED.SEED_ITEMS_REF
+)
     OVERWRITE = TRUE
     SINGLE = TRUE
     HEADER = TRUE;
