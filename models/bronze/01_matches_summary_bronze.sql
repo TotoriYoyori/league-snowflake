@@ -42,9 +42,9 @@ CREATE OR REPLACE STREAM BRONZE.MATCHES_SUMMARY_BRONZE_STM
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE STAGE BRONZE.MATCHES_SUMMARY_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
+    DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for match-level summary CSVs. Expected file: matches_YYYYMMDD.csv';
-
-
+    
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------

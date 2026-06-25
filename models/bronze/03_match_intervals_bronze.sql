@@ -71,8 +71,8 @@ CREATE OR REPLACE STREAM BRONZE.MATCH_INTERVALS_BRONZE_STM
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE STAGE BRONZE.MATCH_INTERVALS_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
+    DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for per-minute interval snapshot CSVs. Expected file: intervals_YYYYMMDD.csv';
-
 
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table

@@ -3,6 +3,9 @@ USE SCHEMA SILVER;
 -------------------------------------------------------------------------------------------
     -- PLAYER_INTERVAL_SILVER TABLE: Player-minute grain. (MATCH_ID, TEAM, MINUTE) FK toward
     -- the team-minute grain. 
+    
+    -- 01. Editted: 2026/06/25 12:58 
+    -- ITEM_0 -> 7 as VARCHAR(255) presented as name --> Is numeric type to keep base ID 
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE TABLE SILVER.PLAYER_INTERVAL_SILVER (
     -- Primary key
@@ -24,13 +27,13 @@ CREATE OR REPLACE TABLE SILVER.PLAYER_INTERVAL_SILVER (
     DEATHS              NUMBER(38,0),
     ASSISTS             NUMBER(38,0),
     -- Itemization
-    ITEM_0              VARCHAR(255),
-    ITEM_1              VARCHAR(255),
-    ITEM_2              VARCHAR(255),
-    ITEM_3              VARCHAR(255),
-    ITEM_4              VARCHAR(255),
-    ITEM_5              VARCHAR(255),
-    ITEM_6              VARCHAR(255),
+    ITEM_0              NUMBER(38,0),
+    ITEM_1              NUMBER(38,0),
+    ITEM_2              NUMBER(38,0),
+    ITEM_3              NUMBER(38,0),
+    ITEM_4              NUMBER(38,0),
+    ITEM_5              NUMBER(38,0),
+    ITEM_6              NUMBER(38,0),
     -- Stats Diff
     GOLD_DIFF           NUMBER(38,0),
     XP_DIFF             NUMBER(38,0),

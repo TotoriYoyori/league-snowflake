@@ -32,8 +32,8 @@ CREATE OR REPLACE STREAM BRONZE.ITEMS_REF_BRONZE_STM
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE STAGE BRONZE.ITEMS_REF_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
+    DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for item reference CSV. Expected file: items_ref.csv';
-
 
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table

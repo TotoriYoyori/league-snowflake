@@ -5,7 +5,11 @@ USE SCHEMA GOLD;
 --     TARGET_LAG = '1 hour'
 --     WAREHOUSE = COMPUTE_WH
 -- AS
-WITH LAST_PLAYER_INTERVAL AS (
+-------------------------------------------------------------------------------------------
+    -- 01. FINAL_SNAPSHOT -> FINAL_SNAPSHOT_WITH_STATS (Base)
+    -- Capture only the last-logged snapshot in player interval data.
+-------------------------------------------------------------------------------------------
+WITH FINAL_SNAPSHOT AS (
     SELECT *
     FROM SILVER.PLAYER_INTERVAL_SILVER
     QUALIFY ROW_NUMBER() OVER (
@@ -14,54 +18,63 @@ WITH LAST_PLAYER_INTERVAL AS (
     ) = 1
 ),
 
-FINAL_SNAPSHOT AS (
+FINAL_SNAPSHOT_WITH_STATS AS (
     SELECT
-        LPI.MATCH_ID,
-        LPI.PARTICIPANT_POS_ID,
-        LPI.KILLS, LPI.DEATHS, LPI.ASSISTS,
-        ARRAY_CONSTRUCT_COMPACT(
-            LPI.ITEM_0, LPI.ITEM_1, LPI.ITEM_2, LPI.ITEM_3, LPI.ITEM_4, LPI.ITEM_5, LPI.ITEM_6
-        ) AS ITEM_BUILD,
+        -- Join key 
+        FS.MATCH_ID,
+        FS.PARTICIPANT_POS_ID,
+        -- Context
         (PS.TEAM = MAT.WINNING_TEAM) AS WIN,
-        PS.CHAMPION
-    FROM LAST_PLAYER_INTERVAL AS LPI
+        PS.CHAMPION,
+        -- Last-interval KDA
+        FS.KILLS, 
+        FS.DEATHS, 
+        FS.ASSISTS,
+        -- Item Build
+        ARRAY_SORT(ARRAY_CONSTRUCT_COMPACT(
+            FS.ITEM_0, FS.ITEM_1, FS.ITEM_2, FS.ITEM_3, FS.ITEM_4, FS.ITEM_5, FS.ITEM_6
+        )) AS ITEM_BUILD,
+    FROM FINAL_SNAPSHOT AS FS
     JOIN SILVER.MATCHES_SUMMARY_SILVER AS MAT
-        ON MAT.MATCH_ID = LPI.MATCH_ID
+        ON MAT.MATCH_ID = FS.MATCH_ID
     JOIN SILVER.PLAYERS_SUMMARY_SILVER AS PS
-        ON PS.MATCH_ID = LPI.MATCH_ID
-        AND PS.PARTICIPANT_POS_ID = LPI.PARTICIPANT_POS_ID
+        ON PS.MATCH_ID = FS.MATCH_ID
+        AND PS.PARTICIPANT_POS_ID = FS.PARTICIPANT_POS_ID
 ),
-
 -------------------------------------------------------------------------------------------
-    -- LATERAL FLATTEN done as its own step (not on the left side of a subsequent JOIN
-    -- -- see prior fix note). Reference table is joined afterward in PLAYER_ITEMS.
+    -- 02. FLATTENED_ITEM --> FLATTENED_ITEMS_WITH_REF
+    -- Break up item's build array and stitch back per player's last logged interval.
+    -- Afterward joined with ITEMS_REF_SILVER to get name and its category
 -------------------------------------------------------------------------------------------
 FLATTENED_ITEMS AS (
     SELECT
         FS.MATCH_ID,
         FS.PARTICIPANT_POS_ID,
-        FS.KILLS, FS.DEATHS, FS.ASSISTS, FS.WIN, FS.CHAMPION,
-        ITEM.VALUE::VARCHAR AS ITEM_NAME
-    FROM FINAL_SNAPSHOT AS FS,
-        LATERAL FLATTEN(INPUT => FS.ITEM_BUILD) AS ITEM
+        FS.WIN, 
+        FS.CHAMPION,
+        FS.KILLS, 
+        FS.DEATHS, 
+        FS.ASSISTS, 
+        -- Exploded one item_id per match-participant
+        ITEM.VALUE::VARCHAR AS ITEM_ID
+    FROM FINAL_SNAPSHOT_WITH_STATS AS FS
+    CROSS JOIN LATERAL FLATTEN(INPUT => FS.ITEM_BUILD) AS ITEM
 ),
 
--------------------------------------------------------------------------------------------
-    -- PLAYER_ITEMS: join category onto flattened rows, exclude Other/Legacy/Distributed
-    -- (not real recommendable shop tiers), and attach a numeric TIER_RANK encoding the
-    -- LoL item-upgrade hierarchy (low -> high):
-    --   1 Trinket, 2 Consumable, 3 Starter, 4 Basic, 5 Boots, 6 Epic, 7 Legendary
-    -- TIER_RANK drives CO_OCCURRENCE below: an item only recommends alongside items of
-    -- the SAME rank or HIGHER (e.g. Basic recommends Basic/Boots/Epic/Legendary, but
-    -- Legendary -- the top of the pipeline -- only recommends other Legendaries).
--------------------------------------------------------------------------------------------
-PLAYER_ITEMS AS (
+FLATTENED_ITEMS_WITH_REF AS (
     SELECT
         FI.MATCH_ID,
         FI.PARTICIPANT_POS_ID,
-        FI.KILLS, FI.DEATHS, FI.ASSISTS, FI.WIN, FI.CHAMPION,
-        FI.ITEM_NAME,
+        FI.WIN, 
+        FI.CHAMPION,
+        FI.KILLS, 
+        FI.DEATHS, 
+        FI.ASSISTS, 
+        -- Joined from ITEMS_REF_SILVER
+        FI.ITEM_ID,
+        IR.ITEM_NAME,
         IR.ITEM_CATEGORY,
+        -- Rank item's category for recommendation system (only recommend equal or higher rank items)
         CASE IR.ITEM_CATEGORY
             WHEN 'Trinket'    THEN 1
             WHEN 'Consumable' THEN 2
@@ -70,13 +83,27 @@ PLAYER_ITEMS AS (
             WHEN 'Boots'      THEN 5
             WHEN 'Epic'       THEN 6
             WHEN 'Legendary'  THEN 7
+            -- IN ('Others', 'Distributed', 'Legacy'). These do not get recommendations. 
+            ELSE NULL
         END AS TIER_RANK
     FROM FLATTENED_ITEMS AS FI
     LEFT JOIN SILVER.ITEMS_REF_SILVER AS IR
-        ON IR.ITEM_NAME = FI.ITEM_NAME
-    WHERE IR.ITEM_CATEGORY NOT IN ('Other', 'Legacy', 'Distributed')
-),
+        ON IR.ITEM_ID = FI.ITEM_ID
+)
 
+SELECT DISTINCT ITEM_ID
+FROM FLATTENED_ITEMS_WITH_REF
+WHERE ITEM_NAME IS NULL
+;
+-------------------------------------------------------------------------------------------
+    -- FLATTENED_ITEMS_WITH_REF: join category onto flattened rows, exclude Other/Legacy/Distributed
+    -- (not real recommendable shop tiers), and attach a numeric TIER_RANK encoding the
+    -- LoL item-upgrade hierarchy (low -> high):
+    --   1 Trinket, 2 Consumable, 3 Starter, 4 Basic, 5 Boots, 6 Epic, 7 Legendary
+    -- TIER_RANK drives CO_OCCURRENCE below: an item only recommends alongside items of
+    -- the SAME rank or HIGHER (e.g. Basic recommends Basic/Boots/Epic/Legendary, but
+    -- Legendary -- the top of the pipeline -- only recommends other Legendaries).
+-------------------------------------------------------------------------------------------
 ITEM_STATS AS (
     SELECT
         CHAMPION,
@@ -85,14 +112,14 @@ ITEM_STATS AS (
         COUNT(*)                                                AS PLAYERS_PURCHASED,
         SUM(IFF(WIN, 1, 0))                                      AS WINS_WITH_ITEM,
         ROUND(AVG((KILLS + ASSISTS) / (DEATHS + 1)), 2)          AS AVG_KDA
-    FROM PLAYER_ITEMS
+    FROM FLATTENED_ITEMS_WITH_REF
     GROUP BY CHAMPION, ITEM_NAME, ITEM_CATEGORY
 ),
 
 -- Denominator now scoped per champion: "player-matches ON THIS CHAMPION with interval data."
 TOTAL_PLAYERS_BY_CHAMPION AS (
     SELECT FS.CHAMPION, COUNT(*) AS TOTAL_PLAYER_MATCHES
-    FROM FINAL_SNAPSHOT AS FS
+    FROM FINAL_SNAPSHOT_WITH_STATS AS FS
     GROUP BY FS.CHAMPION
 ),
 
@@ -116,8 +143,8 @@ CO_OCCURRENCE AS (
         A.ITEM_NAME AS ITEM,
         B.ITEM_NAME AS CO_ITEM,
         COUNT(*)    AS CO_PURCHASE_COUNT
-    FROM PLAYER_ITEMS A
-    JOIN PLAYER_ITEMS B
+    FROM FLATTENED_ITEMS_WITH_REF A
+    JOIN FLATTENED_ITEMS_WITH_REF B
         ON A.MATCH_ID = B.MATCH_ID
         AND A.PARTICIPANT_POS_ID = B.PARTICIPANT_POS_ID
         AND A.CHAMPION = B.CHAMPION
@@ -153,7 +180,7 @@ TOP3_WIDE AS (
 
 -------------------------------------------------------------------------------------------
     -- First-purchase timing, scoped per champion. Same Other/Legacy/Distributed
-    -- exclusion applied here for consistency with PLAYER_ITEMS (tier hierarchy itself
+    -- exclusion applied here for consistency with FLATTENED_ITEMS_WITH_REF (tier hierarchy itself
     -- doesn't affect this CTE -- it's a standalone per-item stat, not a pairwise one).
 -------------------------------------------------------------------------------------------
 ITEM_APPEARANCES AS (
