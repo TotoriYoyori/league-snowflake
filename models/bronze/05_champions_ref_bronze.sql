@@ -31,8 +31,8 @@ CREATE OR REPLACE STREAM BRONZE.CHAMPIONS_REF_BRONZE_STM
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE STAGE BRONZE.CHAMPIONS_REF_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
+    DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for champion reference CSV. Expected file: champions_ref.csv';
-
 
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
