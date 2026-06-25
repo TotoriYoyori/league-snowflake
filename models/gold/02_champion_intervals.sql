@@ -1,25 +1,17 @@
-USE DATABASE LEAGUE_RECORDS;
 USE SCHEMA GOLD;
 -------------------------------------------------------------------------------------------
-    -- CHAMPION_INTERVALS: Champion per-interval aggregated statistics
-    --
-    -- GRAIN: One row per (CHAMPION, MINUTE) — average stats for that champion at that minute.
-    --
     -- KNOWN LIMITATIONS:
-    -- 1. VERY FEW LONG GAMES: not all matches reach later minutes (minute
-    --    35-40+). Matches that end early (stomps, early surrenders) drop out of the sample
-    --    as MINUTE increases, so stats at later minutes reflect only champions/games that
-    --    lasted that long.
-    -- 2. PATCH AND RANK AGNOSTIC: this query aggregates the stats for champions across all
-    --    patches and ranks (from Unranked to Challengers). 
+    --     a. Later intervals have very few matches as not all games go to late games (40+ minutes)
+    --     so make sure to double check ROWS_SAMPLED and use your discretion!
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE DYNAMIC TABLE CHAMPION_INTERVALS
+CREATE OR REPLACE DYNAMIC TABLE GOLD.CHAMPION_INTERVALS
 TARGET_LAG = '1 day'               
 WAREHOUSE = COMPUTE_WH
-COMMENT = 'Champion per-interval aggregated statistics, averaged across all ranks and patches in the dataset.
-KNOWN LIMITATION: very few matches reach later minutes (minute 35-40+).'
+COMMENT = 'Champion per-interval aggregated statistics, averaged across all ranks and patches.'
 AS
-
+-------------------------------------------------------------------------------------------
+    -- CHAMPION_INTERVALS: Champion-minute grain. Aggregated performance of champions over time.
+-------------------------------------------------------------------------------------------
 WITH PLAYER_INTERVAL_CHAMPION AS (
     SELECT
         PS.CHAMPION,
@@ -53,11 +45,12 @@ AGGS AS (
     FROM PLAYER_INTERVAL_CHAMPION
     GROUP BY CHAMPION, MINUTE
 )
-
-SELECT *
-FROM AGGS
-ORDER BY CHAMPION, MINUTE
-;
-
-COMMENT ON COLUMN CHAMPION_INTERVALS.ROWS_SAMPLED IS
+-------------------------------------------------------------------------------------------
+    -- Select all above for complete query (Verify and test results here as well)
+-------------------------------------------------------------------------------------------
+SELECT * FROM AGGS;
+-------------------------------------------------------------------------------------------
+    -- Column-specific comments
+-------------------------------------------------------------------------------------------
+COMMENT ON COLUMN GOLD.CHAMPION_INTERVALS.ROWS_SAMPLED IS
 'Number of rows averaged into this row. Use to judge sample size.';

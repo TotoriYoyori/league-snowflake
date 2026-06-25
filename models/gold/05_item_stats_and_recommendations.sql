@@ -1,16 +1,14 @@
-USE DATABASE LEAGUE_RECORDS;
-
 USE SCHEMA GOLD;
 
--- CREATE OR REPLACE DYNAMIC TABLE GOLD.ITEM_RECOMMEND
---     TARGET_LAG = '1 hour'
---     WAREHOUSE = COMPUTE_WH
--- AS
+
+CREATE OR REPLACE DYNAMIC TABLE GOLD.ITEM_STATS_AND_RECOMMENDATIONS
+TARGET_LAG = '7 days'
+WAREHOUSE = COMPUTE_WH
+COMMENT = 'Item statistics and recommendations, aggregated per champion grain.'
+AS
 -------------------------------------------------------------------------------------------
-    -- 01. FINAL_SNAPSHOT -> LATEST_GAME_DATE -> FINAL_SNAPSHOT_WITH_STATS (Base)
-    -- Capture only the last-logged snapshot in player interval data.
-    -- Rolling window: only matches from the last 7 days are considered to avoid exploding 
-    -- this query on large incremental data.DESCRIBE
+    -- 01. FINAL_SNAPSHOT -> FINAL_SNAPSHOT_WITH_STATS (Base)
+    --     Capture only the last-logged snapshot in player interval data to represent final build.
 -------------------------------------------------------------------------------------------
 WITH FINAL_SNAPSHOT AS (
     SELECT *
@@ -19,11 +17,6 @@ WITH FINAL_SNAPSHOT AS (
         PARTITION BY MATCH_ID, PARTICIPANT_POS_ID
         ORDER BY MINUTE DESC
     ) = 1
-),
--- Since this is a mock pipeline, we have to use the dataset's mock date as latest timestamp.
-LATEST_GAME_DATE AS (
-    SELECT MAX(GAME_DATE) AS MAX_DATE
-    FROM SILVER.MATCHES_SUMMARY_SILVER
 ),
 
 FINAL_SNAPSHOT_WITH_STATS AS (
@@ -45,14 +38,13 @@ FINAL_SNAPSHOT_WITH_STATS AS (
     FROM FINAL_SNAPSHOT AS FS
     JOIN SILVER.MATCHES_SUMMARY_SILVER AS MAT
         ON MAT.MATCH_ID = FS.MATCH_ID
-        AND MAT.GAME_DATE >= DATEADD('day', -7, (SELECT MAX_DATE FROM LATEST_GAME_DATE))
     JOIN SILVER.PLAYERS_SUMMARY_SILVER AS PS
         ON PS.MATCH_ID = FS.MATCH_ID
         AND PS.PARTICIPANT_POS_ID = FS.PARTICIPANT_POS_ID
 ),
 -------------------------------------------------------------------------------------------
-    -- 02. FLATTENED_ITEM --> FLATTENED_ITEMS_WITH_REF
-    -- Break up item's build array and stitch back per player's last logged interval.
+    -- 02. FLATTENED_ITEM
+    --     Break up item's build array and stitch back per player's last logged interval.
 -------------------------------------------------------------------------------------------
 FLATTENED_ITEMS AS (
     SELECT
@@ -69,16 +61,11 @@ FLATTENED_ITEMS AS (
     CROSS JOIN LATERAL FLATTEN(INPUT => FS.ITEM_BUILD) AS ITEM
 ),
 -------------------------------------------------------------------------------------------
-    -- 03. FLATTENED_ITEMS_WITH_REF: Attach a numeric TIER_RANK encoding item-upgrade hierarchy (low -> high):
-    --   1 Trinket, 2 Consumable, 3 Starter, 4 Basic, 5 Boots, 6 Epic, 7 Legendary
-    -- An item only recommends alongside items of the SAME rank or HIGHER 
-    -- (e.g. Basic recommends Basic/Boots/Epic/Legendary, but Legendary, only recommends other Legendaries).
-    --
-    -- NOTE: ITEM_NAME/ITEM_CATEGORY are carried here only for filtering/tier-mapping.
-    -- All downstream joins, GROUP BYs, and the recommendation self-join key on ITEM_ID,
-    -- not ITEM_NAME -- ITEM_NAME is not guaranteed unique (reworks/legacy items can share
-    -- a display name across different IDs), so it's resolved back to a label only once,
-    -- at the very end in ITEM_STATS_FINAL.
+    -- 03. FLATTENED_ITEMS_WITH_REF: 
+    --     a. Attach a numeric TIER_RANK encoding item-upgrade hierarchy (low -> high):
+    --     1 Trinket -> 2 Consumable -> 3 Starter -> 4 Basic -> 5 Boots -> 6 Epic -> 7 Legendary
+    --     b. An item only recommends alongside items of the SAME rank or HIGHER 
+    --     (e.g. Basic recommends Basic/Boots/Epic/Legendary, but Legendary only recommends other Legendaries).
 -------------------------------------------------------------------------------------------
 FLATTENED_ITEMS_WITH_REF AS (
     SELECT
@@ -103,8 +90,8 @@ FLATTENED_ITEMS_WITH_REF AS (
 ), 
 -------------------------------------------------------------------------------------------
     -- 04. ITEM_STATS -> TOTAL_PLAYERS_BY_CHAMPION
-    -- Aggregated stats per champion-item grain (keyed by ITEM_ID) + total champion
-    -- picks across all players in matches.
+    --     Aggregated stats per champion-item grain (keyed by ITEM_ID) + total champion
+    --     picks across all players in matches.
 -------------------------------------------------------------------------------------------
 ITEM_STATS AS (
     SELECT
@@ -127,12 +114,11 @@ TOTAL_PLAYERS_BY_CHAMPION AS (
     GROUP BY FS.CHAMPION
 ),
 -------------------------------------------------------------------------------------------
-    -- 05. CO_OCCURRENCE: tier-hierarchy pairing via ARRAY_AGG + double FLATTEN.
-    -- Replaces self-join with array-based pair generation for better scalability.
-    -- a. Recommendations are two-ways for items of equal ranks
-    --   e.g Infinity Edge <--> Rapid Firecannon (intended)
-    -- b. One way for items of lower to higher ranks
-    --   e.g Doran's Blade --> Infinity Edge (does not make sense reverse)
+    -- 05. CO_OCCURRENCE
+    --     Recommendations are two-ways for items of equal ranks
+    --     e.g Infinity Edge <--> Rapid Firecannon (intended)
+    --     One way for items of lower to higher ranks
+    --     e.g Doran's Blade --> Infinity Edge (does not make sense reverse)
 -------------------------------------------------------------------------------------------
 ITEMS_PER_PLAYER AS (
     SELECT
@@ -152,17 +138,16 @@ CO_OCCURRENCE AS (
         L.VALUE:id::VARCHAR AS ITEM_ID,
         R.VALUE:id::VARCHAR AS CO_ITEM_ID,
         COUNT(*) AS CO_PURCHASE_COUNT
-    FROM ITEMS_PER_PLAYER AS IPP,
-    LATERAL FLATTEN(IPP.ITEMS) AS L,
-    LATERAL FLATTEN(IPP.ITEMS) AS R
+    FROM ITEMS_PER_PLAYER AS IPP
+    CROSS JOIN LATERAL FLATTEN(IPP.ITEMS) AS L
+    CROSS JOIN LATERAL FLATTEN(IPP.ITEMS) AS R
     WHERE L.VALUE:id != R.VALUE:id
-      AND L.VALUE:tier <= R.VALUE:tier
+        AND L.VALUE:tier <= R.VALUE:tier
     GROUP BY IPP.CHAMPION, L.VALUE:id, R.VALUE:id
 ),
 -------------------------------------------------------------------------------------------
-    -- 06. TOP3_WIDE: Format top three recommendations into wide format, keyed by ITEM_ID.
-    -- Resolve CO_ITEM_ID -> CO_ITEM name here, since this is presentation output that
-    -- feeds directly into the final SELECT.
+    -- 06. TOP3_WIDE
+    --     Format top three recommendations into wide format
 -------------------------------------------------------------------------------------------
 TOP3_WIDE AS (
     SELECT
@@ -179,7 +164,7 @@ TOP3_WIDE AS (
             IR.ITEM_NAME AS CO_ITEM_NAME,
             ROW_NUMBER() OVER (
                 PARTITION BY CO.CHAMPION, CO.ITEM_ID 
-                ORDER BY CO.CO_PURCHASE_COUNT DESC, IR.ITEM_NAME -- Break even by name alphabetically
+                ORDER BY CO.CO_PURCHASE_COUNT DESC, IR.ITEM_NAME
             ) AS CO_RANK
         FROM CO_OCCURRENCE AS CO
         LEFT JOIN SILVER.ITEMS_REF_SILVER AS IR
@@ -189,9 +174,8 @@ TOP3_WIDE AS (
     GROUP BY CHAMPION, ITEM_ID
 ),
 -------------------------------------------------------------------------------------------
-    -- 07. FIRST_PURCHASE: compute MIN(MINUTE) per player-item without CHAMPION in GROUP BY
-    --     (CHAMPION is functionally dependent on MATCH_ID + PARTICIPANT_POS_ID).
-    --     Then FIRST_PURCHASE_COUNTS aggregates by CHAMPION after joining it back.
+    -- 07. FIRST_PURCHASE: 
+    --     Most common first purchase time interval for items, grouped by champion-item
 -------------------------------------------------------------------------------------------
 ITEM_APPEARANCES AS (
     SELECT
@@ -200,9 +184,6 @@ ITEM_APPEARANCES AS (
         PI.MINUTE,
         ITEM.VALUE::VARCHAR AS ITEM_ID
     FROM SILVER.PLAYER_INTERVAL_SILVER AS PI
-    JOIN SILVER.MATCHES_SUMMARY_SILVER AS MAT
-        ON MAT.MATCH_ID = PI.MATCH_ID
-        AND MAT.GAME_DATE >= DATEADD('day', -7, (SELECT MAX_DATE FROM LATEST_GAME_DATE))
     CROSS JOIN LATERAL FLATTEN(INPUT => ARRAY_CONSTRUCT_COMPACT(
         PI.ITEM_0, PI.ITEM_1, PI.ITEM_2, PI.ITEM_3, PI.ITEM_4, PI.ITEM_5, PI.ITEM_6
     )) AS ITEM
@@ -246,18 +227,15 @@ MOST_COMMON_FIRST_PURCHASE AS (
     ) = 1
 ),
 -------------------------------------------------------------------------------------------
-    -- 08. ITEM_STATS_FINAL: Put together and select presentation.
-    -- This is the ONLY place ITEM_NAME/ITEM_CATEGORY are resolved for the primary item --
-    -- every join above it (ITEM_STATS, CO_OCCURRENCE, TOP3_WIDE, MOST_COMMON_FIRST_PURCHASE)
-    -- is keyed on ITEM_ID.
+    -- 08. ITEM_STATS_FINAL
 -------------------------------------------------------------------------------------------
 ITEM_STATS_FINAL AS (
     SELECT
         IS_.CHAMPION,
-        IR.ITEM_NAME                                                          AS ITEM,
+        IR.ITEM_NAME AS ITEM,
         IR.ITEM_CATEGORY,
-        ROUND(IS_.PLAYERS_PURCHASED / TP.TOTAL_PLAYER_PICKS::FLOAT, 4)       AS PLAYER_PURCHASE_RATE,
-        ROUND(IS_.WINS_WITH_ITEM / IS_.PLAYERS_PURCHASED::FLOAT, 4)            AS WIN_RATE,
+        ROUND(IS_.PLAYERS_PURCHASED / TP.TOTAL_PLAYER_PICKS::FLOAT, 4) AS PLAYER_PURCHASE_RATE,
+        ROUND(IS_.WINS_WITH_ITEM / IS_.PLAYERS_PURCHASED::FLOAT, 4) AS WIN_RATE,
         IS_.AVG_KDA,
         MCFP.MOST_COMMON_FIRST_PURCHASE_MINUTE,
         T3.TOP_ITEM_1,
@@ -276,8 +254,6 @@ ITEM_STATS_FINAL AS (
         AND MCFP.ITEM_ID = IS_.ITEM_ID
 )
 -------------------------------------------------------------------------------------------
-    -- Verify and test with different settings here
+    -- Select all above for complete query (Verify and test results here as well)
 -------------------------------------------------------------------------------------------
-SELECT *
-FROM ITEM_STATS_FINAL
-;
+SELECT * FROM ITEM_STATS_FINAL;
