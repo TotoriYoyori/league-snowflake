@@ -1,25 +1,24 @@
-USE DATABASE LEAGUE_RECORDS;
 USE SCHEMA GOLD;
 -------------------------------------------------------------------------------------------
--- MATCH_STATS_SUMMARY: Match-grain summary of final team stats and match context.
---
--- GRAIN: One row per MATCH_ID, including remakes/unfinished games. 
---
--- DESIGN NOTES:
--- 1. WINNING_GOLD_DIFF reports the gold differential of whichever team won, so it's always
---    framed as "the winner's gold lead" rather than "blue's gold lead." 
+    -- DESIGN NOTES:
+    --     WINNING_GOLD_DIFF reports the gold differential of whichever team won, so it's always
+    --     framed as "the winner's gold lead" rather than "blue's gold lead." A winning team
+    --     that was at a gold loss will report negative WINNING_GOLD_DIFF.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE DYNAMIC TABLE MATCH_STATS_SUMMARY
-TARGET_LAG = '5 minutes'
+CREATE OR REPLACE DYNAMIC TABLE GOLD.MATCH_TEAM_STATS_SUMMARY
+TARGET_LAG = '1 day'
 WAREHOUSE = COMPUTE_WH
-COMMENT = 'Match-grain summary of final team stats (kills, towers, dragons, void grubs, heralds, barons, gold diff) 
-and match context (duration, date, winner, average rank).'
+COMMENT = 'Match-grain summary with team statistics.'
 AS
-
+-------------------------------------------------------------------------------------------
+    -- 01. TEAM_FINAL -> PIVOT_TEAM_STATS
+    --     Capture team stats only at last snapshot interval and pivot them for wide view.
+-------------------------------------------------------------------------------------------
 WITH TEAM_FINAL AS (
     SELECT 
         MATCH_ID,
         TEAM,
+        MINUTE,
         TEAM_KILLS,
         TEAM_TOWERS,
         TEAM_DRAGONS,
@@ -36,6 +35,7 @@ WITH TEAM_FINAL AS (
 
 PIVOT_TEAM_STATS AS (
     SELECT MATCH_ID,
+        MAX(MINUTE) AS LAST_LOGGED_MINUTE,
         MAX(CASE WHEN TEAM = 'Blue' THEN TEAM_KILLS END) AS BLUE_KILLS,
         MAX(CASE WHEN TEAM = 'Red' THEN TEAM_KILLS END) AS RED_KILLS,
         MAX(CASE WHEN TEAM = 'Blue' THEN TEAM_TOWERS END) AS BLUE_TOWERS,
@@ -53,7 +53,9 @@ PIVOT_TEAM_STATS AS (
     FROM TEAM_FINAL
     GROUP BY MATCH_ID
 ),
-
+-------------------------------------------------------------------------------------------
+    -- 02. MATCH_STATS_SUMMARY_CTE
+-------------------------------------------------------------------------------------------
 MATCH_STATS_SUMMARY_CTE AS (
     SELECT 
         -- Primary key
@@ -76,21 +78,27 @@ MATCH_STATS_SUMMARY_CTE AS (
         P.RED_HERALDS,
         P.BLUE_BARONS,
         P.RED_BARONS,
-        -- Gold diff of the winning team only; NULL when WINNING_TEAM isn't 'Blue'/'Red'
-        -- (e.g. an unresolved/remade match with no clean winner).
+        -- Gold diff of the winning team only
         CASE 
             WHEN M.WINNING_TEAM = 'Blue' THEN P.BLUE_GOLD_DIFF
             WHEN M.WINNING_TEAM = 'Red'  THEN P.RED_GOLD_DIFF
-        END AS WINNING_GOLD_DIFF
+        END AS WINNING_GOLD_DIFF,
+        GREATEST(M.GAME_DURATION - P.LAST_LOGGED_MINUTE * 60, 0) AS UNLOGGED_DURATION
     FROM PIVOT_TEAM_STATS AS P
     JOIN SILVER.MATCHES_SUMMARY_SILVER AS M
         ON P.MATCH_ID = M.MATCH_ID
 )
-
-SELECT *
-FROM MATCH_STATS_SUMMARY_CTE
+-------------------------------------------------------------------------------------------
+    -- Select all above for complete query (Verify and test results here as well)
+-------------------------------------------------------------------------------------------
+SELECT * FROM MATCH_STATS_SUMMARY_CTE;
+-------------------------------------------------------------------------------------------
+    -- Column-specific comments
+-------------------------------------------------------------------------------------------
+COMMENT ON COLUMN GOLD.MATCH_TEAM_STATS_SUMMARY.UNLOGGED_DURATION IS
+'Seconds between the last logged 5-minute interval and actual match end (GAME_DURATION). Inform how stale BLUE_*/RED_* stats can be for this row.'
 ;
 
--- Column-level comments
-COMMENT ON COLUMN MATCH_STATS_SUMMARY.WINNING_GOLD_DIFF IS
-'Gold differential of the WINNING_TEAM specifically (not Blue''s gold diff) at the final recorded minute. NULL if WINNING_TEAM is not exactly Blue or Red.';
+COMMENT ON COLUMN GOLD.MATCH_TEAM_STATS_SUMMARY.WINNING_GOLD_DIFF IS
+'Gold differential of the WINNING_TEAM specifically. A winning team at a gold loss reports a negative value.'
+;
