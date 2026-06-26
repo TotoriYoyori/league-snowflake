@@ -9,6 +9,7 @@ USE SCHEMA GOLD;
 CREATE OR REPLACE DYNAMIC TABLE GOLD.CHAMPION_OVERVIEW
 TARGET_LAG = '1 day'
 WAREHOUSE = COMPUTE_WH
+REFRESH_MODE = FULL
 COMMENT = 'Champion-level pick/win/ban rate and primary lane.'
 AS
 -------------------------------------------------------------------------------------------

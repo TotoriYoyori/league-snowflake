@@ -8,6 +8,7 @@ USE SCHEMA GOLD;
 CREATE OR REPLACE DYNAMIC TABLE GOLD.MATCH_TEAM_STATS_SUMMARY
 TARGET_LAG = '1 day'
 WAREHOUSE = COMPUTE_WH
+REFRESH_MODE = FULL
 COMMENT = 'Match-grain summary with team statistics.'
 AS
 -------------------------------------------------------------------------------------------

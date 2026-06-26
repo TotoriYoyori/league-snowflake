@@ -7,6 +7,7 @@ USE SCHEMA GOLD;
 CREATE OR REPLACE DYNAMIC TABLE GOLD.CHAMPION_INTERVALS
 TARGET_LAG = '1 day'               
 WAREHOUSE = COMPUTE_WH
+REFRESH_MODE = FULL
 COMMENT = 'Champion per-interval aggregated statistics, averaged across all ranks and patches.'
 AS
 -------------------------------------------------------------------------------------------

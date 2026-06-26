@@ -4,6 +4,7 @@ USE SCHEMA GOLD;
 CREATE OR REPLACE DYNAMIC TABLE GOLD.ITEM_STATS_AND_RECOMMENDATIONS
 TARGET_LAG = '7 days'
 WAREHOUSE = COMPUTE_WH
+REFRESH_MODE = FULL
 COMMENT = 'Item statistics and recommendations, aggregated per champion grain.'
 AS
 -------------------------------------------------------------------------------------------
