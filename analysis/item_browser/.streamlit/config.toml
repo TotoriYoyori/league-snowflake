@@ -1,0 +1,17 @@
+# Base theme. Colors mirror src_theme.py so native widgets and custom HTML agree.
+# The ZCOOL XiaoWei display font is applied via CSS in src_theme.py. In a
+# locked-down Streamlit-in-Snowflake sandbox where the Google Fonts CDN is
+# blocked, drop the .ttf into assets/ and uncomment the [[theme.fontFaces]]
+# block below instead.
+
+[theme]
+base = "light"
+primaryColor = "#BE9A57"
+backgroundColor = "#F7F2E7"
+secondaryBackgroundColor = "#FBF8F0"
+textColor = "#3D3526"
+font = "serif"
+
+[[theme.fontFaces]]
+family = "ZCOOL XiaoWei"
+url = "assets/ZCOOLXiaoWei-Regular.ttf"
