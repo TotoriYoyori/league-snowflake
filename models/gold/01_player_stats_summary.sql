@@ -150,3 +150,4 @@ COMMENT ON COLUMN GOLD.PLAYER_STATS_SUMMARY.UNLOGGED_DURATION IS
 -- FROM DIAGNOSTIC_LAST_INTERVAL_GAP
 -- ;
 -------------------------------------------------------------------------------------------
+SELECT * FROM GOLD.PLAYER_STATS_SUMMARY;

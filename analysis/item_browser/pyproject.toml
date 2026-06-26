@@ -1,0 +1,13 @@
+[project]
+name = "itemization_explorer"
+version = "0.1.0"
+description = "Internal itemization explorer: stats, recommendations, gems and traps."
+requires-python = "~=3.11.0"
+# Only streamlit[snowflake], no version specifiers -> resolves against the
+# container runtime's pre-installed packages, so NO External Access Integration
+# is needed. pandas / numpy / snowflake-snowpark-python all arrive transitively
+# and are already present in the runtime. Adding anything else here (or pinning a
+# version) makes uv reach out to PyPI, which a trial account without an EAI can't do.
+dependencies = [
+    "streamlit[snowflake]"
+]
