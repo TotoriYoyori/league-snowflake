@@ -14,7 +14,8 @@ USE SCHEMA GOLD;
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE DYNAMIC TABLE GOLD.PLAYER_STATS_SUMMARY
 TARGET_LAG = '1 day'         
-WAREHOUSE = COMPUTE_WH    
+WAREHOUSE = COMPUTE_WH
+REFRESH_MODE = FULL
 COMMENT = 'One end game player stat per (MATCH_ID, PARTICIPANT_POS_ID).'
 AS
 -------------------------------------------------------------------------------------------
