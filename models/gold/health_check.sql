@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------------------
--- GOLD DATA-QUALITY ASSERTIONS
+-- GOLD DATA QUALITY ASSERTIONS
 -- Runs all checks against the 5 GOLD dynamic tables and reports PASS/FAIL per check.
 --
 -- HOW-TO-USE:

@@ -11,7 +11,8 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------------------
--- 01. ROW COUNT DIFFS: Run this to see the difference in row counts between silver vs. gold
+-- 01. ROW COUNT DIFFS: Uncomment and run this to see the difference in row counts between silver vs. gold
+-- A similar query is available in /gold/monitor.ipynb.
 -------------------------------------------------------------------------------------------
 -- WITH SILVER_PLAYER AS (
 --     SELECT COUNT(DISTINCT MATCH_ID, PARTICIPANT_POS_ID) AS ROW_COUNTS
@@ -58,6 +59,7 @@ USE SCHEMA BRONZE;
 
 -------------------------------------------------------------------------------------------
 -- 02. CONFIRM SOURCE-LEVEL MISSING DATA (silver vs bronze comparison)
+-- A similar query is available in /gold/monitor.ipynb
 -------------------------------------------------------------------------------------------
 -- WITH MISSING_RECORDS_IN_SILVER AS (
 --     SELECT COUNT(DISTINCT SL.MATCH_ID) AS UNLOGGED_INTERVAL_MATCHES
