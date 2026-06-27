@@ -1,17 +1,25 @@
 ![League of Legends banner](assets/img/league_banner.jpg)
 
-# League of Legends Match Analytics
+# League of Legends ELT pipeline for 2.1 million in-game snapshots
+## Click here to setup yourself → **[`setup/INSTALL_GUIDE.md`](setup/INSTALL_GUIDE.md)**
 
-An ELT pipeline built entirely on Snowflake using a medallion architecture (Bronze → Silver → Gold). Raw match data from five source tables flows through simulated daily ingestion into clean, queryable analytics tables.
+This project takes **39,954 real matches**, and runs it through a full medallion pipeline on Snowflake. You can query the final tables, and even interact with them via Streamlit apps.
 
-## Questions This Pipeline Can Answer
+The source data is hooked to a `simulate_daily_load` procedure so that users can slowly ingest the above **2.1 millions** records over a period of ~700 days (make pretend daily data load!). 
 
-- How does early-game gold advantage translate into win probability?
-- Which objective combinations (dragons, barons, heralds) have the strongest impact on game outcome?
-- How do individual player stats (KDA, CS, items) evolve over the course of a match?
-- What champion/role combinations dominate at different rank tiers?
+Regardless, this pipeline is built to look and behave like a *real* production worthy pipeline: run now and forever. Data arrives daily, cleans itself, aggregates itself, and refreshes on a schedule. Built entirely within Snowflake's **$400 free trial credits**,
+in **under three weeks of solo development**.
 
-## Architecture
+----
+## Here's the whole thing in five lines:
+
+* **Bronze → Silver → Gold** pipeline, built entirely on Snowflake.
+* Source data is fed in **one simulated day at a time**, just like a real source system.
+* **Bronze** lands it raw, **Silver** cleans it via streams + tasks, **Gold** aggregates it via dynamic tables.
+* On top of Gold sit **Streamlit apps** for exploring items, modeling KDA odds, and monitoring the pipeline activites.
+* **Monitoring notebooks, health checks scripts, and notification integration** are also set up for your convenience, just fill in your own information.
+
+
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -20,20 +28,66 @@ An ELT pipeline built entirely on Snowflake using a medallion architecture (Bron
 │    SEED     │    BRONZE     │      SILVER       │       GOLD        │
 │             │               │                   │                   │
 │ Source CSVs │ Raw landing   │ Cleaned/enriched  │ Aggregated        │
-│ loaded once │ via pipes     │ via stream+task   │ analytical views  │
-│             │ + metadata    │                   │   (planned)       │
+│ loaded once │ via pipes     │ via stream+task   │ analytical tables │
+│             │ + metadata    │                   │ via dynamic tables│
 └─────────────┴───────────────┴───────────────────┴───────────────────┘
 ```
 
-### Pipeline Flow
+```
+league-snowflake/
+├── setup/              
+├── models/
+│   ├── _infra/         # DDL for tables, views, pipes, etc. per folder under model.
+│   ├── bronze/        
+│   ├── silver/         
+│   └── gold/           
+├── patch/              # ad-hoc fixes applied to the live pipeline over time
+├── analysis/           
+├── tests/              
+├── data_vault_ref/     # archived earlier modeling approach (reference only)
+└── run_daily_ingestion.sql   # one-click: ingest the next simulated day
+```
 
-1. **Seed** — Full source datasets uploaded once to `@SEED.SEED_UPLOAD_STG` (simulates a source system)
-2. **`SIMULATE_DAILY_LOAD()`** — Chunks data by date (latest first), stages CSVs, refreshes pipes
-3. **Bronze** — Pipes load staged files into landing tables with ingestion metadata
-4. **Silver** — Streams detect new bronze rows → tasks merge into cleaned/enriched tables
-5. **Gold** — Aggregated views for analytics consumption *(planned)*
+----
+## What can it answer?
 
-## Data Sources
+The Gold layer is designed around the questions an analyst (or a curious player) actually asks. Each one maps to a table you can query directly:
+
+| Question | Answered by |
+|----------|-------------|
+| Does an early gold lead actually win games? | `MATCH_TEAM_STATS_SUMMARY` |
+| Which objectives — dragons, barons, grubs — swing a match most? | `MATCH_TEAM_STATS_SUMMARY` |
+| How does a champion grow over the course of a game? | `CHAMPION_INTERVALS` |
+| How did a given player's game actually end up? | `PLAYER_STATS_SUMMARY` |
+| Which champions and lanes dominate the meta? | `CHAMPION_OVERVIEW` |
+| What should I build on champion *X*? | `ITEM_STATS_AND_RECOMMENDATIONS` |
+
+----
+## But why not just go to OP.gg ?
+
+Fair question. Sites like *op.gg* or *u.gg* already show win rates and item builds.
+
+But they're built for a different audience. This pipeline is for **internal development and analytics teams**, not casual lookups, and that changes what it offers:
+
+* **Transparent statistics.** Every number is open source — you can read exactly how a win rate is computed instead of trusting a black box.
+* **Adjustable parameters.** Shrinkage strength, minimum sample size, time windows — these are knobs you turn.
+* **Continuously ingesting.** Data flows in daily and Gold refreshes itself, with potential for NRT (near real time) loading.
+* **Honest about its limits.** Every row carries how stale it might be and how large its sample was. Teams can judge the data and make decisions.
+
+> **The short of it:** stat sites answer *"what's good right now?"* This answers *"why, by how much, and how confident are we?"*. This pipeline is also very easy to setup. 
+
+----
+## The apps
+
+This pipeline comes with the following three Streamlit apps:
+1. **Itemization Explorer** *(browsing — live)* — pick a champion and browse every item by buy rate and win rate. Raw win rates get smoothed with empirical-Bayes shrinkage toward each champion's own baseline, which tames the noisy long tail and surfaces genuine **hidden gems** and **trap items**.
+2. **Probability of KDA** *(statistical modeling — live)* — choose a stat and a match minute, and get the probability that a player — or a whole group — clears a KDA threshold, built from sampling distributions and the central limit theorem.
+3. **Pipeline Monitor** *(observability — planned)* — a live dashboard for the pipeline itself: ingestion progress, stream lag, task history, and Gold refresh state, all in one place.
+
+> **Info:** Each app runs two ways from the same code — against the live warehouse inside Snowflake, or fully offline against CSV exports for local development and demos.
+
+----
+## Data sources
 
 Five source tables from the Kaggle dataset:
 
@@ -47,72 +101,5 @@ Five source tables from the Kaggle dataset:
 
 Source: [LoL Match Intervals: 2 Million In-Game Snapshots](https://www.kaggle.com/datasets/nathansmallcalder/league-of-legends-match-interval-snapshots-2026)
 
-## Project Structure
-
-```
-league-snowflake/
-├── README.md
-├── run_daily_ingestion.sql         -- one-click: ingest next day of data
-├── .gitignore
-├── assets/
-│
-├── setup/
-│   ├── INSTALL_GUIDE.md            -- step-by-step setup walkthrough
-│   ├── 01_deploy.sql               -- orchestrates all model scripts via EXECUTE IMMEDIATE
-│   ├── 02_seed_source.sql          -- validates stage + loads CSVs into seed tables
-│   └── 03_activate_tasks.sql       -- resumes all bronze-to-silver tasks
-│
-├── models/
-│   ├── _infra/
-│   │   ├── 01_db_and_schema.sql    -- SEED/BRONZE/SILVER/GOLD schemas
-│   │   ├── 02_seed_tables.sql      -- seed table DDLs + date index + load state + upload stage
-│   │   ├── 03_validate_seed_upload.sql -- guard: checks required files exist in stage
-│   │   └── 04_simulate_daily_load.sql  -- orchestrator + staging procedures + state management
-│   │
-│   ├── bronze/                     -- each file is self-contained: table + stream + stage + pipe
-│   │   ├── 00_file_format.sql      -- LEAGUE_CSV_FMT (shared by all bronze stages)
-│   │   ├── 01_matches_summary_bronze.sql
-│   │   ├── 02_players_summary_bronze.sql
-│   │   ├── 03_match_intervals_bronze.sql
-│   │   ├── 04_items_ref_bronze.sql
-│   │   └── 05_champions_ref_bronze.sql
-│   │
-│   └── silver/                     -- cleaning views + tables + merge tasks
-│       ├── 01_matches_summary_silver.sql
-│       ├── 02_players_summary_silver.sql
-│       ├── 03_references_silver.sql        -- items + champions
-│       ├── 04_split_match_intervals_stream_cleaning.sql
-│       ├── 05a_team_interval_silver.sql
-│       ├── 05b_player_interval_silver.sql
-│       └── 06_bronze_to_silver_intervals_task.sql
-│
-├── tests/
-│   ├── 01_test_deploy.sql          -- deploys abridged pipeline to TEST_PIPELINE_DB
-│   ├── 02_test_seed_and_run.sql    -- seeds + simulates one load (matches only)
-│   ├── 03_test_teardown.sql        -- drops TEST_PIPELINE_DB
-│   └── test_results.ipynb          -- notebook: cell-by-cell inspection queries
-│
-├── analysis/                       -- notebooks + streamlit apps for data exploration
-│
-└── data_vault_ref/                 -- archived data vault implementation (reference only)
-```
-
-## Getting Started
-
-See **[`setup/INSTALL_GUIDE.md`](setup/INSTALL_GUIDE.md)** for the full walkthrough. The short version:
-
-1. Create a Workspace from this repo
-2. Run `setup/01_deploy.sql`
-3. Upload CSVs to `@SEED.SEED_UPLOAD_STG` via Snowsight UI
-4. Run `setup/02_seed_source.sql`
-5. Run `setup/03_activate_tasks.sql`
-6. Run `run_daily_ingestion.sql` — repeat for each simulated day
-
-## Stacks Used
-
-- **Snowflake** — warehouse, stages, pipes, streams, tasks, stored procedures
-- **Snowflake Workspaces** — deployment directly from workspace file tree via `snow://` URIs
-
-## Archived: Data Vault Reference
-
-The `data_vault_ref/` directory contains a previous implementation using data vault modeling (hubs, satellites, streams, tasks). It is kept as a portfolio reference but is not deployed or maintained. The active pipeline uses the medallion architecture described above.
+----
+*(Rito if you like this send me an email and hire me please. I make you money. → stan.mng@gmail.com)*
