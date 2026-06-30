@@ -1,0 +1,6 @@
+RELATIVE_PATH,FILE_SIZE_KB,LAST_MODIFIED,FILE_URL
+matches_summary.csv.gz,1024,2026-05-01 09:58:02,https://.../matches_summary.csv.gz
+players_summary.csv.gz,2560,2026-05-01 09:58:14,https://.../players_summary.csv.gz
+intervals.csv.gz,65536,2026-05-01 09:59:40,https://.../intervals.csv.gz
+items_ref.csv.gz,6,2026-05-01 09:57:50,https://.../items_ref.csv.gz
+champions_ref.csv.gz,2,2026-05-01 09:57:48,https://.../champions_ref.csv.gz

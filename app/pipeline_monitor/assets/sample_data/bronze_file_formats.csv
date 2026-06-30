@@ -1,0 +1,2 @@
+name,database_name,schema_name,type,owner
+BRONZE_CSV_FF,LEAGUE_RECORDS,BRONZE,CSV,SYSADMIN

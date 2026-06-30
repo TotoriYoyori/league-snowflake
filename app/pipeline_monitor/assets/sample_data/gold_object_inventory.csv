@@ -1,0 +1,6 @@
+OBJECT_TYPE,OBJECT_NAME,TARGET_LAG,OWNER,COMMENT
+DYNAMIC TABLE,PLAYER_STATS_SUMMARY,1 hour,SYSADMIN,Match-player end game snapshot
+DYNAMIC TABLE,CHAMPION_INTERVALS,1 hour,SYSADMIN,Champion aggregated performance over time
+DYNAMIC TABLE,CHAMPION_OVERVIEW,1 hour,SYSADMIN,"Champion aggregated info e.g. win-rates, ban-rates"
+DYNAMIC TABLE,MATCH_TEAM_STATS_SUMMARY,1 hour,SYSADMIN,Match-grain pivot view
+DYNAMIC TABLE,ITEM_STATS_AND_RECOMMENDATIONS,7 days,SYSADMIN,"Champion and item usage rate, recommendations"
