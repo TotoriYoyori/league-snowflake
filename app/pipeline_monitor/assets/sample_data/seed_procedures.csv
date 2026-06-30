@@ -1,0 +1,3 @@
+PROCEDURE_NAME,SIGNATURE,COMMENT
+VALIDATE_SEED_UPLOAD,(),Guards seed ingestion by verifying all required CSV files exist in @SEED.SEED_UPLOAD_STG.
+SIMULATE_DAILY_LOAD,(),Advances the simulated daily ingestion pointer by one day.

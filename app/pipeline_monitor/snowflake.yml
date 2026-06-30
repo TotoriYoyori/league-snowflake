@@ -1,0 +1,26 @@
+definition_version: 2
+entities:
+  streamlit_app:
+    type: streamlit
+    identifier:
+      database: LEAGUE_RECORDS
+      schema: GOLD
+      name: PIPELINE_MONITOR
+    title: PIPELINE MONITORING DASHBOARD
+    query_warehouse: COMPUTE_WH
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
+    run_mode: SpcsOnly
+    execute_as: OWNER
+    main_file: streamlit_app.py
+    artifacts:
+      - streamlit_app.py
+      - settings.py
+      - src/__init__.py
+      - src/query.py
+      - src/mock.py
+      - src/data.py
+      - src/theme.py
+      - src/ui.py
+      - pyproject.toml
+      - .streamlit/config.toml
+      - assets/

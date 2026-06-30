@@ -1,0 +1,6 @@
+DATASET,TABLE_ROWS,CSV_ROWS,STATUS
+matches_summary,39954,39954,PASS
+players_summary,399540,399540,PASS
+intervals,2110532,2110532,PASS
+items_ref,635,635,PASS
+champions_ref,173,173,PASS

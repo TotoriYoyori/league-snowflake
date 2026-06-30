@@ -1,0 +1,2 @@
+name,database_name,schema_name,url,has_credentials,has_encryption_key,owner,comment,region,type
+SEED_UPLOAD_STG,LEAGUE_RECORDS,SEED,,N,N,SYSADMIN,Manual upload landing for the 5 source CSVs,,Internal
