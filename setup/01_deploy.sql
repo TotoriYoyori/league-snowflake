@@ -43,6 +43,7 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/03_champion_overview.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/04_match_team_stats_summary.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/05_item_stats_and_recommendations.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/06_diff_interval_state.sql';
 
 -------------------------------------------------------------------------------------------
 -- PATCHES - AD-HOC TO THE PIPELINE DURING DEVELOPMENTS
