@@ -102,4 +102,9 @@ Five source tables from the Kaggle dataset:
 Source: [LoL Match Intervals: 2 Million In-Game Snapshots](https://www.kaggle.com/datasets/nathansmallcalder/league-of-legends-match-interval-snapshots-2026)
 
 ----
+## Known limitations / future work
+
+- **No run/data-snapshot tracking.** Each `role_importance()` call reflects whatever is in `GOLD.DIFF_INTERVAL_STATE` at the moment it's run, but the output isn't currently logged or timestamped against the underlying data state. This means results aren't directly comparable across runs over time (e.g., "did lane importance shift after the role-quest patch?") without manually noting when each run happened. Adding a lightweight run log (timestamp + `GAME_DATE` range + resulting `lane_importance` table) would support that comparison later.
+
+----
 *(Rito if you like this send me an email and hire me please. I make you money. → stan.mng@gmail.com)*
