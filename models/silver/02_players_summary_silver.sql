@@ -20,7 +20,13 @@ SELECT
         ELSE NULL
     END                                                             AS TEAM,
     -- Split PascalCase to Title Case: 'TwistedFate' --> 'Twisted Fate'
-    TRIM(REGEXP_REPLACE(CHAMPION, '([a-z])([A-Z])', '\\1 \\2'))     AS CHAMPION,
+    -- Known exception: raw source spells this champion 'FiddleSticks' (PascalCase, splits to
+    -- 'Fiddle Sticks'), but CHAMPIONS_REF's raw source spells it 'Fiddlesticks' (one word, no
+    -- case transition for the regex to catch).
+    REPLACE(
+        TRIM(REGEXP_REPLACE(CHAMPION, '([a-z])([A-Z])', '\\1 \\2')),
+        'Fiddle Sticks', 'Fiddlesticks'
+    )                                                               AS CHAMPION,
     -- Standardize + Normalize lane naming
     CASE UPPER(TRIM(INDIVIDUAL_POSITION))
         WHEN 'INVALID'    THEN NULL

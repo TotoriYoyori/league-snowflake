@@ -66,16 +66,15 @@ VALUES
     -- VERIFY: Verify that BRONZE.ITEMS_REF_BRONZE have received the change and all downstream
     -- propagations happen for this schema (ITEMS_REF_SILVER)
 -------------------------------------------------------------------------------------------
-SELECT 
-    COUNT(B.ITEM_ID) AS BRONZE_ROWS_INSERTED,
-    COUNT(S.ITEM_ID) AS SILVER_ROWS_INSERTED,
-    COUNT(B.ITEM_ID) = COUNT(S.ITEM_ID) AS ALL_RECORDS_PROPAGATED
-FROM (
-    SELECT ITEM_ID
-    FROM BRONZE.ITEMS_REF_BRONZE 
-    WHERE RSRC = 'Manual backfill'
-        AND TO_CHAR(LDTS, 'YYYY-MM-DD') = '2026-06-25'
-) AS B
-JOIN SILVER.ITEMS_REF_SILVER AS S
-    ON S.ITEM_ID = B.ITEM_ID
-;
+--SELECT
+--    COUNT(B.ITEM_ID) AS BRONZE_ROWS_INSERTED,
+--    COUNT(S.ITEM_ID) AS SILVER_ROWS_INSERTED,
+--    COUNT(B.ITEM_ID) = COUNT(S.ITEM_ID) AS ALL_RECORDS_PROPAGATED
+--FROM (
+--    SELECT ITEM_ID
+--    FROM BRONZE.ITEMS_REF_BRONZE
+--    WHERE RSRC = 'Manual backfill'
+--) AS B
+--JOIN SILVER.ITEMS_REF_SILVER AS S
+--    ON S.ITEM_ID = B.ITEM_ID
+--;

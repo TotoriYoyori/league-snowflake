@@ -1,5 +1,11 @@
 -------------------------------------------------------------------------------------------
 -- 00. SETUP DATABASE AND DEPLOY SESSION CONTEXT
+--
+-- WARNING: DESTRUCTIVE. CREATE OR REPLACE DATABASE below drops LEAGUE_RECORDS and everything
+-- in it -- all seeded data, all simulated ingestion progress (SEED.SEED_LOAD_STATE), all Gold
+-- history -- before rebuilding from scratch. Re-running this file is a full teardown/rebuild,
+-- not an incremental update. Re-seed and re-run run_daily_ingestion.sql afterward if you want
+-- data back.
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE DATABASE LEAGUE_RECORDS
     COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo and standard League of Legends matches.';
@@ -50,7 +56,6 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260625_add_orphan_item_id_under_ref.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260627_view_flag_missing_records.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260703_fix_fiddlestick_naming.sql';
 
 -------------------------------------------------------------------------------------------
 -- 06. PROCEDURES

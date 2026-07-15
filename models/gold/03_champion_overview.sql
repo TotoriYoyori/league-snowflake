@@ -2,7 +2,7 @@
 USE SCHEMA GOLD;
 -------------------------------------------------------------------------------------------
     -- DESIGN NOTES:
-    --     To properly inform win rates, all remakes/unfinished games (GAME_DURATION < 300s) 
+    --     To properly inform win rates, all remakes/unfinished games (GAME_DURATION < 300s)
     --     are excluded (since LoL remakes occur between 1:30 - 5:00). Other statistics use
     --     all matches.
 -------------------------------------------------------------------------------------------
@@ -19,10 +19,7 @@ AS
 WITH PLAYER_MATCH_ALL AS (
     SELECT
         MAT.MATCH_ID,
-        CASE 
-            WHEN PS.CHAMPION = 'Fiddle Sticks' THEN 'Fiddlesticks' 
-            ELSE PS.CHAMPION 
-        END AS CHAMPION,
+        PS.CHAMPION,
         PS.LANE
     FROM SILVER.MATCHES_SUMMARY_SILVER AS MAT
     JOIN SILVER.PLAYERS_SUMMARY_SILVER AS PS
@@ -31,10 +28,7 @@ WITH PLAYER_MATCH_ALL AS (
 
 PLAYER_MATCH_NO_REMAKE AS (
     SELECT
-        CASE 
-            WHEN PS.CHAMPION = 'Fiddle Sticks' THEN 'Fiddlesticks' 
-            ELSE PS.CHAMPION 
-        END AS CHAMPION,
+        PS.CHAMPION,
         (PS.TEAM = MAT.WINNING_TEAM) AS WIN
     FROM (
         SELECT * FROM SILVER.MATCHES_SUMMARY_SILVER

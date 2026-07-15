@@ -85,3 +85,9 @@ FROM (SELECT CHAMPION_ID, CHAMPION_NAME FROM LEAGUE_RECORDS.SEED.SEED_CHAMPIONS_
 
 ALTER PIPE LEAGUE_RECORDS.BRONZE.ITEMS_REF_PP REFRESH;
 ALTER PIPE LEAGUE_RECORDS.BRONZE.CHAMPIONS_REF_PP REFRESH;
+
+
+-------------------------------------------------------------------------------------------
+-- 4. KICKSTART: Load the first simulated day now
+-------------------------------------------------------------------------------------------
+CALL SEED.SIMULATE_DAILY_LOAD();

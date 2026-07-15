@@ -1,4 +1,5 @@
 # Snowflake workspace metadata
+.idea/
 .snowflake/
 .temp/
 .folder
