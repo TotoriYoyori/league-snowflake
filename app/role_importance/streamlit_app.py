@@ -1,159 +1,84 @@
 import streamlit as st
-import os
-import math
-import numpy as np
-import pandas as pd
 
-from src_data import get_session, get_data
-from src_query import ProbabilityOfKDAQuery
-
-# ----- Get Data
-session = get_session()
-query = ProbabilityOfKDAQuery(
-    order_direction="ASC",
-    include_kda_ratio=True
-)
-data = get_data(session, query.build())
+from settings import settings
+from src import data, ui
+from src.ui import theme
 
 
-# --- Constants ---
-STATS_OPTIONS = ["KILLS", "DEATHS", "ASSISTS", "KDA_RATIO"]
+# --------------- CONSTANTS ---------------
+SECONDS_PER_MINUTE = 60
 
 
-# --- Pure math (replaces scipy.stats.norm.cdf) ---
-def normal_cdf(x: float, mean: float, std: float) -> float:
-    if std == 0:
-        return 1.0 if x <= mean else 0.0
-    z = (x - mean) / std
-    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-
-
-# --- Core Logic ---
-def prep_arr(df: pd.DataFrame, minute: int, stat: str) -> np.ndarray:
-    return df.loc[df["MINUTE"] == minute, stat].to_numpy()
-
-
-def sampling_distribution(
-    arr: np.ndarray,
-    sample_size: int,
-    n_runs: int,
-    seed: int = 42,
-) -> np.ndarray:
-    rng = np.random.default_rng(seed=seed)
-    samples = rng.choice(arr, size=(n_runs, sample_size), replace=True)
-    return samples.mean(axis=1)
-
-
-def group_probability_of_kda(
-    arr: np.ndarray,
-    bounds: float,
-    sample_size: int,
-    n_runs: int,
-) -> dict:
-    """P(group of `sample_size` players averages at least `bounds`)
-    using sampling distribution + normal CDF (CLT-justified).
-    """
-    sampling_arr = sampling_distribution(arr, sample_size, n_runs)
-    sampling_mean = float(np.mean(sampling_arr))
-    sampling_se = float(np.std(sampling_arr))
-
-    prob = 1.0 - normal_cdf(bounds, sampling_mean, sampling_se)
-
-    return {
-        "probability": prob,
-        "sampling_mean": sampling_mean,
-        "sampling_se": sampling_se,
-        "sampling_arr": sampling_arr,
-    }
-
-
-def single_probability_of_kda(
-    arr: np.ndarray,
-    bounds: float,
-) -> dict:
-    """P(single player achieves at least `bounds`)
-    using empirical CDF — no normality assumption.
-    """
-    prob = float(np.mean(arr >= bounds))
-
-    return {
-        "probability": prob,
-        "n_observations": len(arr),
-        "mean": float(np.mean(arr)),
-        "std": float(np.std(arr)),
-    }
-
-
-# --- App UI ---
-st.title("Probability of KDA")
-st.write(
-    "Calculate the probability of player KDA statistics "
-    "at any given match interval."
+# --------------- APP ---------------
+st.set_page_config(
+    page_title="LEAGUE_SNOWFLAKE Role Importance",
+    layout="wide",
 )
 
-# --- Parameters ---
-st.subheader("Parameters")
+with st.sidebar:
+    st.markdown("### Configuration · 配置")
+    st.caption(f"Environment · 环境: **{'local' if data.IS_LOCAL else 'production'}**")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    stat = st.selectbox("Stat", options=STATS_OPTIONS)
-with col2:
-    minute = st.select_slider("Minute Interval", options=list(range(5, 91, 5)), value=30)
-with col3:
-    bounds = st.slider("Bound (at least X)", min_value=0.0, max_value=30.0, value=5.0, step=0.5)
-
-with st.expander("Sampling Parameters (Group Probability)"):
-    sample_col1, sample_col2 = st.columns(2)
-    with sample_col1:
-        sample_size = st.slider("Sample Size", min_value=5, max_value=200, value=10, step=5)
-    with sample_col2:
-        n_runs = st.slider("Number of Runs", min_value=100, max_value=50000, value=10000, step=100)
-
-# --- Load and Filter ---
-arr = prep_arr(data, minute, stat)
-
-if len(arr) == 0:
-    st.warning(f"No data available for {stat} at minute {minute}.")
-    st.stop()
-
-# --- Results ---
-st.divider()
-
-group_result = group_probability_of_kda(arr, bounds, sample_size, n_runs)
-single_result = single_probability_of_kda(arr, bounds)
-
-col_group, col_single = st.columns(2)
-
-with col_group:
-    st.subheader("Group Probability")
-    st.caption(f"Group of {sample_size} players averaging at least {bounds} {stat}")
-    st.metric(
-        label="Probability",
-        value=f"{group_result['probability'] * 100:.2f}%",
+    minute = st.select_slider(
+        "Minute · 分钟",
+        options=list(settings.minute_options),
+        value=settings.default_minute,
     )
-    st.metric("Sampling Mean", f"{group_result['sampling_mean']:.4f}")
-    st.metric("Standard Error", f"{group_result['sampling_se']:.4f}")
-
-with col_single:
-    st.subheader("Single Player Probability")
-    st.caption(f"One player achieving at least {bounds} {stat}")
-    st.metric(
-        label="Probability",
-        value=f"{single_result['probability'] * 100:.2f}%",
+    team = st.radio(
+        "Team · 方",
+        options=list(settings.team_options),
+        format_func=lambda t: f"{t} · {'蓝' if t == 'Blue' else '红'}",
+        index=list(settings.team_options).index(settings.default_team),
+        horizontal=True,
     )
-    st.metric("Population Mean", f"{single_result['mean']:.4f}")
-    st.metric("Population Std", f"{single_result['std']:.4f}")
+    min_game_duration_minutes = st.select_slider(
+        "Min match length (min) · 最短比赛时长（分钟）",
+        options=list(settings.min_game_duration_options),
+        value=settings.default_min_game_duration_minutes,
+        help="Excludes matches shorter than this e.g. remakes or very early forfeits · "
+             "排除短于此时长的对局，例如重开局或早期投降",
+    )
+    min_game_duration = min_game_duration_minutes * SECONDS_PER_MINUTE  # DB column is in seconds
 
-# --- Distribution Chart ---
-st.divider()
-st.subheader("Sampling Distribution of Means")
-st.caption(f"Distribution of group means (n={sample_size}, runs={n_runs})")
+    st.divider()
+    st.markdown("#### Cross-Validation · 交叉验证")
+    n_splits = st.number_input(
+        "n_splits · 分裂次数",
+        min_value=settings.cv_n_splits_range[0],
+        max_value=settings.cv_n_splits_range[1],
+        value=settings.cv_n_splits_default,
+    )
+    n_repeats = st.number_input(
+        "n_repeats · 重复次数",
+        min_value=settings.cv_n_repeats_range[0],
+        max_value=settings.cv_n_repeats_range[1],
+        value=settings.cv_n_repeats_default,
+    )
 
-hist_df = pd.DataFrame({"Sample Mean": group_result["sampling_arr"]})
-st.bar_chart(
-    hist_df["Sample Mean"].value_counts(bins=30).sort_index(),
-    x_label=f"Mean {stat}",
-    y_label="Count",
+    st.divider()
+    st.caption(
+        "Gold diffs are scaled to per-1,000g units throughout. "
+        "Lane Importance and Predictor share one model fit on all "
+        "available data; Model Evaluation uses a held-out test split.\n\n"
+        "金币差均以每 1000 金为单位缩放。分路重要性与预测器共用同一个基于全部数据拟合的模型；"
+        "模型评估则使用留出测试集。"
+    )
+
+theme.inject(st)
+ui.render_header()
+
+tab_eda, tab_eval, tab_importance, tab_predictor = st.tabs(
+    [f"{en} · {zh}" for en, zh in ui.TAB_LABELS]
 )
 
-st.caption(f"Based on {single_result['n_observations']} observations at minute {minute}.")
+with tab_eda:
+    ui.render_eda_tab(settings, minute, team, min_game_duration)
+
+with tab_eval:
+    ui.render_evaluation_tab(settings, minute, team, min_game_duration)
+
+with tab_importance:
+    ui.render_importance_tab(settings, minute, team, n_splits, n_repeats, min_game_duration)
+
+with tab_predictor:
+    ui.render_predictor_tab(settings, minute, team, min_game_duration)
