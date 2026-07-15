@@ -9,7 +9,6 @@ entities:
     title: LANE GOLD-DIFF WIN COEFFICIENT TRACKER
     query_warehouse: COMPUTE_WH
     main_file: streamlit_app.py
-    run_mode: OwnerMode
     artifacts:
       - streamlit_app.py
       - environment.yml
