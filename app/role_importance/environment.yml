@@ -2,10 +2,9 @@ name: role-importance
 channels:
   - snowflake
 dependencies:
-  - python=3.11
-  - streamlit=1.52.2
+  - streamlit
   - snowflake-snowpark-python
-  - pydantic=2.*
+  - pydantic
   - pandas
   - numpy
   - scikit-learn

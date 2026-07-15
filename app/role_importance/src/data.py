@@ -16,7 +16,14 @@ from src.model import (
 
 # --------------- CONSTANTS ---------------
 # SiS session token file only exists inside Snowflake -> use Snowflake live data.
-IS_LOCAL: bool = not os.path.isfile("/snowflake/session/token")
+IS_LOCAL: bool
+try:
+    _conn = st.connection("snowflake", ttl=None)
+    _conn.session()
+    IS_LOCAL = False
+except Exception:
+    IS_LOCAL = True
+    
 CACHE_TTL = 600
 
 
