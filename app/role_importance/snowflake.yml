@@ -4,16 +4,16 @@ entities:
     type: streamlit
     identifier:
       database: LEAGUE_RECORDS
-      schema: SILVER
-      name: PROBABILITY_OF_KDA
-    title: Predict probability of achieving KDA stats
+      schema: GOLD
+      name: ROLE_IMPORTANCE
+    title: LANE GOLD-DIFF WIN COEFFICIENT TRACKER
     query_warehouse: COMPUTE_WH
-    compute_pool: SYSTEM_COMPUTE_POOL_CPU
-    run_mode: SpcsOnly
-    execute_as: OWNER
-    main_file: src/streamlit_app.py
+    main_file: streamlit_app.py
+    run_mode: OwnerMode
     artifacts:
-      - src/streamlit_app.py
-      - src/data.py
-      - pyproject.toml
+      - streamlit_app.py
+      - environment.yml
+      - settings.py
+      - src/
       - .streamlit/config.toml
+      - assets/
