@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------------------
--- LEAGUE-SNOWFLAKE DEPLOYMENT SCRIPT (MEDALLION ARCHITECTURE)
+-- 00. SETUP DATABASE AND DEPLOY SESSION CONTEXT
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE DATABASE LEAGUE_RECORDS
     COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo and standard League of Legends matches.';
@@ -9,13 +9,13 @@ USE WAREHOUSE COMPUTE_WH;
 USE DATABASE LEAGUE_RECORDS;
 
 -------------------------------------------------------------------------------------------
--- INFRASTRUCTURE
+-- 01. INFRASTRUCTURE
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/01_db_and_schema.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/02_seed_tables.sql';
 
 -------------------------------------------------------------------------------------------
--- BRONZE - RAW INGESTION
+-- 02. BRONZE: RAW INGESTION
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/00_file_format.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/01_matches_summary_bronze.sql';
@@ -25,7 +25,7 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/05_champions_ref_bronze.sql';
 
 -------------------------------------------------------------------------------------------
--- SILVER - CLEANED & ENRICHED
+-- 03. SILVER: CLEANED & ENRICHED
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/01_matches_summary_silver.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/02_players_summary_silver.sql';
@@ -36,7 +36,7 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/06_bronze_to_silver_intervals_task.sql';
 
 -------------------------------------------------------------------------------------------
--- GOLD - ANALYTICAL (dynamic tables; self-refresh via TARGET_LAG, no task activation)
+-- 04. GOLD: ANALYTICAL (dynamic tables; self-refresh via TARGET_LAG, no task activation)
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/01_player_stats_summary.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/02_champion_intervals.sql';
@@ -46,14 +46,14 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/06_diff_interval_state.sql';
 
 -------------------------------------------------------------------------------------------
--- PATCHES - AD-HOC TO THE PIPELINE DURING DEVELOPMENTS
+-- 05. PATCHES: AD-HOC TO THE PIPELINE DURING DEVELOPMENTS
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260625_add_orphan_item_id_under_ref.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260627_view_flag_missing_records.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260703_fix_fiddlestick_naming.sql';
 
 -------------------------------------------------------------------------------------------
--- PROCEDURES
+-- 06. PROCEDURES
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/03_validate_seed_upload.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/_infra/04_simulate_daily_load.sql';
