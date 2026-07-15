@@ -124,4 +124,5 @@ FROM (
         METADATA$FILE_ROW_NUMBER,
         'League Client Daily Logger'
     FROM @BRONZE.MATCH_INTERVALS_STG
-);
+)
+ON_ERROR = 'CONTINUE';

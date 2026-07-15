@@ -273,7 +273,9 @@ First load may take a few seconds for the warehouse to figure things out.
 
 The seed tables hold the *full* historical dataset. The `SIMULATE_DAILY_LOAD()` procedure stages **one day at a time**.
 
-Note that for this pipeline the **latest date is ingested first then going backward** because the number of records are sparse on older dates, while more recent dates allows you to ingest more records, but the idea of daily simulation is the same.
+Note that for this pipeline the **latest date is ingested first then going backward**. This is because the number of records
+are sparse on older dates, while more recent dates allows you to ingest more records, but the idea of daily simulation 
+is the same.
 
 ### 👉 Whenever you want to ingest 'another day worth of data', open `run_daily_ingestion.sql` at the workspace rootand click **Run All**.
 

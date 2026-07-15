@@ -50,4 +50,5 @@ FROM (
         METADATA$FILE_ROW_NUMBER,
         'League Static Data'
     FROM @BRONZE.CHAMPIONS_REF_STG
-);
+)
+ON_ERROR = 'CONTINUE';

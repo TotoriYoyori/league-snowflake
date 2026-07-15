@@ -61,4 +61,5 @@ FROM (
         METADATA$FILE_ROW_NUMBER,
         'League Client Daily Logger'
     FROM @BRONZE.PLAYERS_SUMMARY_STG
-);
+)
+ON_ERROR = 'CONTINUE';
