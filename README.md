@@ -13,29 +13,34 @@ Designing a one-shot pipeline of course is much simpler.
 
 
 Regardless, this pipeline is built to look and behave like a *real* production worthy pipeline: run now and forever. 
-Data arrives daily, cleans itself, aggregates itself, and refreshes on a schedule. Built entirely within 
-Snowflake's **$400 free trial credits**, in **under a month of solo development**.
+Data arrives daily, cleans itself, aggregates itself, and refreshes on a schedule. Built entirely within the limit of 
+Snowflake's free trial credits, in **under a month of solo development**.
 
 ----
 ## The Streamlit Apps
 
-This pipeline comes with the following three Streamlit apps (you can click on each to visit their demo site!)
+This pipeline comes with the following three Streamlit apps. **All of which are capable of running either LIVE on Snowflake (using real data 
+produced by the pipeline), or just using mock data.**
+
+You can click on each highlighted name below to visit their demo site on Streamlit Cloud! This demo version uses mock data, which is a
+sample of the real data that you would receive from the pipeline. 
+
 1. **[Itemization Explorer](https://league-sf-item-browser.streamlit.app/)**: pick a champion and browse every item 
 by buy rate and win rate. Employ empirical-Bayes shrinkage for noisy low-n buy samples.
 
-   <!-- TODO: drag-and-drop item_browser.mp4 into the GitHub web editor here; delete this comment once embedded. -->
+https://github.com/user-attachments/assets/b4bfd5aa-1652-4e3f-8759-45b5abeab6c9
 
-2. **[Role Importance](https://league-sf-role-importance.streamlit.app/)**: a logistic regression model that turns 
+3. **[Role Importance](https://league-sf-role-importance.streamlit.app/)**: a logistic regression model that turns 
 each lane's gold diff at a chosen match minute into a win coefficient. Same model also powers a live predictor: 
 type in 5 gold diffs, get a win probability back.
 
-   <!-- TODO: drag-and-drop role_coef_live.mp4 into the GitHub web editor here; delete this comment once embedded. -->
+https://github.com/user-attachments/assets/eb6cd0ef-abc9-4505-b540-1eff1882ee90
 
-3. **[Pipeline Monitor](https://league-sf-pipeline.streamlit.app/)**: a live dashboard for the pipeline itself: 
+4. **[Pipeline Monitor](https://league-sf-pipeline.streamlit.app/)**: a live dashboard for the pipeline itself: 
 27 checks across Seed, Bronze, Silver, and Gold. From ingestion progress, stream lag, task history, to Gold refresh 
 state, all in one place.
 
-   <!-- TODO: drag-and-drop pipeline_monitoring.mp4 into the GitHub web editor here; delete this comment once embedded. -->
+https://github.com/user-attachments/assets/8df32ce6-13bb-42e8-b6f3-41875744a125
 
 > **Info:** Each app runs two ways from the same code: 1. against the live warehouse inside Snowflake, or 2.
 fully offline against CSV exports for local development and demos.
@@ -49,7 +54,6 @@ fully offline against CSV exports for local development and demos.
 * On top of Gold sit **Streamlit apps** for exploring items, modeling win probability from gold diffs, and monitoring 
 the pipeline activites.
 * **Monitoring notebooks and health checks scripts** are also set up for your convenience.
-
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -87,17 +91,13 @@ relatively to a stats aggregator site like OP.gg.
 * **Honest about its limits.** Every row carries how stale it might be and how large its sample was. Teams can judge the data and make decisions.
 
 ----
-## See it running
+## Showcase
 
-<!-- TODO: drag-and-drop database_tree.mp4 into the GitHub web editor here (Edit README.md on github.com).
-     GitHub uploads it to its own asset host and auto-embeds a player — just delete this comment once the
-     video link appears above/below it. Shows all 4 schemas (SEED/BRONZE/SILVER/GOLD) expanded in the tree. -->
+The pipeline and all its item in the database tree.
 
-The pipeline all row counts after ingestion.
+https://github.com/user-attachments/assets/c3680031-7c95-44e1-8029-f626c2f202a4
 
-![Check that it works — Bronze, Silver, Gold, and Seed row counts in one grid](assets/img/check_that_it_works.png)
-
-Gold's dynamic table lineage and refresh lag.
+Gold's dynamic table lineage and refresh lag example.
 
 ![Gold dynamic table dependency graph](assets/img/gold_graph.png)
 
@@ -149,6 +149,3 @@ role-quest patch?"). You have to eyeball and track things manually for now.
 - **Warehouse Runtime outdated:** The Streamlit apps are currently deployed on Snowflake using WH runtime, which is the 
 legacy mode. Modern standard is using Container Runtime, but because I'm on a trial account I do not have access to
 external package dependencies.
-
-----
-*(Rito if you like this email me and hire me please. I make you money. → stan.mng@gmail.com)*
