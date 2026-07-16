@@ -33,13 +33,13 @@ BEGIN
                 s.BLUE_BANS, 
                 s.RED_BANS
             FROM SEED.SEED_MATCHES_SUMMARY s
-            JOIN SEED.SEED_MATCH_DATE_INDEX AS idx 
+            JOIN SEED._SEED_MATCH_DATE_INDEX AS idx 
                 ON s.MATCH_ID = idx.MATCH_ID
             WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''
         )
         FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
         HEADER = TRUE
-        OVERWRITE = FALSE
+        OVERWRITE = TRUE
         SINGLE = TRUE';
 
     EXECUTE IMMEDIATE v_sql;
@@ -76,13 +76,13 @@ BEGIN
                 p.ROLE,
                 p.INDIVIDUAL_POSITION
             FROM SEED.SEED_PLAYERS_SUMMARY p
-            JOIN SEED.SEED_MATCH_DATE_INDEX idx
+            JOIN SEED._SEED_MATCH_DATE_INDEX idx
                 ON p.MATCH_ID = idx.MATCH_ID
             WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''
         )
         FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
         HEADER    = TRUE
-        OVERWRITE = FALSE
+        OVERWRITE = TRUE
         SINGLE    = TRUE';
         
     EXECUTE IMMEDIATE v_sql;
@@ -147,13 +147,13 @@ BEGIN
                 i.XP_DIFF,
                 i.TEAM_GOLD_DIFF
             FROM SEED.SEED_MATCH_INTERVALS i
-            JOIN SEED.SEED_MATCH_DATE_INDEX idx
+            JOIN SEED._SEED_MATCH_DATE_INDEX idx
                 ON i.MATCH_ID = idx.MATCH_ID
             WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''
         )
         FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
         HEADER    = TRUE
-        OVERWRITE = FALSE
+        OVERWRITE = TRUE
         SINGLE    = TRUE';
         
     EXECUTE IMMEDIATE v_sql;
@@ -169,7 +169,7 @@ $$;
 CREATE OR REPLACE PROCEDURE SEED.INITIALIZE_SEED_LOAD_STATE()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Initializes SEED_LOAD_STATE with max/min dates from SEED_MATCH_DATE_INDEX. No-op if already initialized.'
+COMMENT = 'Initializes SEED_LOAD_STATE with max/min dates from _SEED_MATCH_DATE_INDEX. No-op if already initialized.'
 AS
 $$
 DECLARE
@@ -186,11 +186,11 @@ BEGIN
     END IF;
 
     UPDATE SEED.SEED_LOAD_STATE
-       SET CURRENT_LOAD_DATE = (SELECT MAX(GAME_DATE_DAY) FROM SEED.SEED_MATCH_DATE_INDEX),
-           MIN_DATE          = (SELECT MIN(GAME_DATE_DAY) FROM SEED.SEED_MATCH_DATE_INDEX),
-           MAX_DATE          = (SELECT MAX(GAME_DATE_DAY) FROM SEED.SEED_MATCH_DATE_INDEX);
+       SET CURRENT_LOAD_DATE = (SELECT MAX(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX),
+           MIN_DATE          = (SELECT MIN(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX),
+           MAX_DATE          = (SELECT MAX(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX);
 
-    RETURN 'Initialized. Starting from ' || (SELECT MAX(GAME_DATE_DAY) FROM SEED.SEED_MATCH_DATE_INDEX);
+    RETURN 'Initialized. Starting from ' || (SELECT MAX(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX);
 END;
 $$;
 
@@ -216,7 +216,7 @@ BEGIN
 
     SELECT MAX(GAME_DATE_DAY) 
     INTO :v_next_date
-    FROM SEED.SEED_MATCH_DATE_INDEX
+    FROM SEED._SEED_MATCH_DATE_INDEX
     WHERE GAME_DATE_DAY < :P_CURRENT_DATE;
 
     IF (:v_next_date IS NULL) THEN
