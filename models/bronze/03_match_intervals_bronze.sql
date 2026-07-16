@@ -4,56 +4,56 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Raw match interval data with load metadata
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE BRONZE.MATCH_INTERVALS_BRONZE (
+CREATE TABLE IF NOT EXISTS BRONZE.MATCH_INTERVALS_BRONZE (
     -- Identifier
-  ID NUMBER(38,0) NOT NULL,
-  MATCH_ID VARCHAR(255) NOT NULL,
-  PLAYER_ID NUMBER(38,0) NOT NULL,
+    ID VARCHAR NOT NULL,
+    MATCH_ID VARCHAR NOT NULL,
+    PLAYER_ID VARCHAR NOT NULL,
     -- Economy
-  MINUTE NUMBER(2,0) NOT NULL,
-  CURRENT_GOLD NUMBER(38,0),
-  TOTAL_GOLD NUMBER(38,0),
-  CS NUMBER(38,0),
-  JUNGLE_CS NUMBER(38,0),
-  XP NUMBER(38,0),
-  LEVEL NUMBER(38,0),
+    MINUTE VARCHAR NOT NULL,
+    CURRENT_GOLD VARCHAR,
+    TOTAL_GOLD VARCHAR,
+    CS VARCHAR,
+    JUNGLE_CS VARCHAR,
+    XP VARCHAR,
+    LEVEL VARCHAR,
     -- KDA
-  KILLS NUMBER(38,0),
-  DEATHS NUMBER(38,0),
-  ASSISTS NUMBER(38,0),
+    KILLS VARCHAR,
+    DEATHS VARCHAR,
+    ASSISTS VARCHAR,
     -- Itemization
-  ITEM_0 NUMBER(38,0),
-  ITEM_1 NUMBER(38,0),
-  ITEM_2 NUMBER(38,0),
-  ITEM_3 NUMBER(38,0),
-  ITEM_4 NUMBER(38,0),
-  ITEM_5 NUMBER(38,0),
-  ITEM_6 NUMBER(38,0),
+    ITEM_0 VARCHAR,
+    ITEM_1 VARCHAR,
+    ITEM_2 VARCHAR,
+    ITEM_3 VARCHAR,
+    ITEM_4 VARCHAR,
+    ITEM_5 VARCHAR,
+    ITEM_6 VARCHAR,
     -- Team's Objective
-  TEAM_KILLS NUMBER(38,0),
-  TEAM_INHIBITORS NUMBER(38,0),
-  TEAM_TOWERS NUMBER(38,0),
-  TEAM_DRAGONS_FIRE NUMBER(38,0),
-  TEAM_DRAGONS_WATER NUMBER(38,0),
-  TEAM_DRAGONS_EARTH NUMBER(38,0),
-  TEAM_DRAGONS_AIR NUMBER(38,0),
-  TEAM_DRAGONS_CHEMTECH NUMBER(38,0),
-  TEAM_DRAGONS_HEXTECH NUMBER(38,0),
-  TEAM_DRAGONS NUMBER(38,0),
-  TEAM_BARONS NUMBER(38,0),
-  TEAM_VOID_GRUBS NUMBER(38,0),
-  TEAM_HERALDS NUMBER(38,0),
+    TEAM_KILLS VARCHAR,
+    TEAM_INHIBITORS VARCHAR,
+    TEAM_TOWERS VARCHAR,
+    TEAM_DRAGONS_FIRE VARCHAR,
+    TEAM_DRAGONS_WATER VARCHAR,
+    TEAM_DRAGONS_EARTH VARCHAR,
+    TEAM_DRAGONS_AIR VARCHAR,
+    TEAM_DRAGONS_CHEMTECH VARCHAR,
+    TEAM_DRAGONS_HEXTECH VARCHAR,
+    TEAM_DRAGONS VARCHAR,
+    TEAM_BARONS VARCHAR,
+    TEAM_VOID_GRUBS VARCHAR,
+    TEAM_HERALDS VARCHAR,
     -- Stats Diff
-  GOLD_DIFF NUMBER(38,0),
-  XP_DIFF NUMBER(38,0),
-  TEAM_GOLD_DIFF NUMBER(38,0),
+    GOLD_DIFF VARCHAR,
+    XP_DIFF VARCHAR,
+    TEAM_GOLD_DIFF VARCHAR,
     -- Load Metadata
-  LDTS TIMESTAMP_NTZ(9) NOT NULL,
-  FILE_NAME VARCHAR(255) NOT NULL,
-  FILE_ROW_NUMBER NUMBER(38,0) NOT NULL,
-  RSRC VARCHAR(255) NOT NULL,
+    LDTS TIMESTAMP_NTZ(9) NOT NULL,
+    FILE_NAME VARCHAR(255) NOT NULL,
+    FILE_ROW_NUMBER NUMBER(38,0) NOT NULL,
+    RSRC VARCHAR(255) NOT NULL,
     -- Constraints
-  CONSTRAINT MATCH_INTERVALS_BRONZE_PKEY PRIMARY KEY (ID)
+    CONSTRAINT MATCH_INTERVALS_BRONZE_PKEY PRIMARY KEY (ID)
 )
 COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via MATCH_INTERVALS_PP from @MATCH_INTERVALS_STG.';
 
@@ -61,7 +61,7 @@ COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via MATCH_INTERVALS_PP 
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STREAM BRONZE.MATCH_INTERVALS_BRONZE_STM
+CREATE STREAM IF NOT EXISTS BRONZE.MATCH_INTERVALS_BRONZE_STM
     ON TABLE BRONZE.MATCH_INTERVALS_BRONZE
     COMMENT = 'MATCH_INTERVALS_BRONZE delta --> BRONZE_TO_SILVER_INTERVALS_TASK --> MATCH_INTERVALS_SILVER';
 
@@ -69,7 +69,7 @@ CREATE OR REPLACE STREAM BRONZE.MATCH_INTERVALS_BRONZE_STM
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for interval snapshot CSVs
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STAGE BRONZE.MATCH_INTERVALS_STG
+CREATE STAGE IF NOT EXISTS BRONZE.MATCH_INTERVALS_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for per-minute interval snapshot CSVs. Expected file: intervals_YYYYMMDD.csv';
@@ -77,7 +77,7 @@ CREATE OR REPLACE STAGE BRONZE.MATCH_INTERVALS_STG
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PIPE BRONZE.MATCH_INTERVALS_PP
+CREATE PIPE IF NOT EXISTS BRONZE.MATCH_INTERVALS_PP
 COMMENT = 'Match interval snapshot ingestion. Ingest frequency --> Daily.'
 AS
 COPY INTO BRONZE.MATCH_INTERVALS_BRONZE
@@ -125,4 +125,22 @@ FROM (
         'League Client Daily Logger'
     FROM @BRONZE.MATCH_INTERVALS_STG
 )
-ON_ERROR = 'CONTINUE';
+ON_ERROR = 'SKIP_FILE_10%';
+
+
+-------------------------------------------------------------------------------------------
+    -- 5. _MATCH_INTERVALS_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW BRONZE._MATCH_INTERVALS_LOAD_ERRORS AS
+SELECT
+    FILE_NAME,
+    LAST_LOAD_TIME,
+    ROW_COUNT,
+    (ROW_PARSED - ROW_COUNT) AS ROWS_REJECTED,
+    ERROR_COUNT,
+    FIRST_ERROR_MESSAGE
+FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+    TABLE_NAME => 'BRONZE.MATCH_INTERVALS_BRONZE',
+    START_TIME => DATEADD(DAY, -30, CURRENT_TIMESTAMP())
+))
+WHERE ERROR_COUNT > 0;

@@ -4,15 +4,15 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Player-level summary with load metadata
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE BRONZE.PLAYERS_SUMMARY_BRONZE (
+CREATE TABLE IF NOT EXISTS BRONZE.PLAYERS_SUMMARY_BRONZE (
     -- Source columns
-    ID                   NUMBER(38,0) NOT NULL,
-    MATCH_ID             VARCHAR(255) NOT NULL,
-    PARTICIPANT_ID       NUMBER(38,0),
-    TEAM_ID              NUMBER(38,0),
-    CHAMPION             VARCHAR(255),
-    ROLE                 VARCHAR(255),
-    INDIVIDUAL_POSITION  VARCHAR(255),
+    ID                   VARCHAR NOT NULL,
+    MATCH_ID             VARCHAR NOT NULL,
+    PARTICIPANT_ID       VARCHAR,
+    TEAM_ID              VARCHAR,
+    CHAMPION             VARCHAR,
+    ROLE                 VARCHAR,
+    INDIVIDUAL_POSITION  VARCHAR,
     -- Load Metadata
     LDTS                 TIMESTAMP_NTZ(9) NOT NULL,
     FILE_NAME            VARCHAR(255) NOT NULL,
@@ -27,7 +27,7 @@ COMMENT = '[BRONZE] Raw player summary. Loaded via PLAYERS_SUMMARY_PP from @PLAY
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STREAM BRONZE.PLAYERS_SUMMARY_BRONZE_STM
+CREATE STREAM IF NOT EXISTS BRONZE.PLAYERS_SUMMARY_BRONZE_STM
     ON TABLE BRONZE.PLAYERS_SUMMARY_BRONZE
     COMMENT = 'PLAYERS_SUMMARY_BRONZE delta --> BRONZE_TO_SILVER_PLAYERS_TASK --> PLAYERS_SUMMARY_SILVER';
 
@@ -35,7 +35,7 @@ CREATE OR REPLACE STREAM BRONZE.PLAYERS_SUMMARY_BRONZE_STM
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for player summary CSVs
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STAGE BRONZE.PLAYERS_SUMMARY_STG
+CREATE STAGE IF NOT EXISTS BRONZE.PLAYERS_SUMMARY_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for player-level summary CSVs. Expected file: players_YYYYMMDD.csv';
@@ -43,7 +43,7 @@ CREATE OR REPLACE STAGE BRONZE.PLAYERS_SUMMARY_STG
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PIPE BRONZE.PLAYERS_SUMMARY_PP
+CREATE PIPE IF NOT EXISTS BRONZE.PLAYERS_SUMMARY_PP
 COMMENT = 'Player summary ingestion. Ingest frequency --> Daily.'
 AS
 COPY INTO BRONZE.PLAYERS_SUMMARY_BRONZE
@@ -62,4 +62,22 @@ FROM (
         'League Client Daily Logger'
     FROM @BRONZE.PLAYERS_SUMMARY_STG
 )
-ON_ERROR = 'CONTINUE';
+ON_ERROR = 'SKIP_FILE_10%';
+
+
+-------------------------------------------------------------------------------------------
+    -- 5. _PLAYERS_SUMMARY_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW BRONZE._PLAYERS_SUMMARY_LOAD_ERRORS AS
+SELECT
+    FILE_NAME,
+    LAST_LOAD_TIME,
+    ROW_COUNT,
+    (ROW_PARSED - ROW_COUNT) AS ROWS_REJECTED,
+    ERROR_COUNT,
+    FIRST_ERROR_MESSAGE
+FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+    TABLE_NAME => 'BRONZE.PLAYERS_SUMMARY_BRONZE',
+    START_TIME => DATEADD(DAY, -30, CURRENT_TIMESTAMP())
+))
+WHERE ERROR_COUNT > 0;

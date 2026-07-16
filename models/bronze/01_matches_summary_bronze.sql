@@ -4,20 +4,20 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
     -- 1. TABLE DDL:  Match-level summary with load metadata
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE BRONZE.MATCHES_SUMMARY_BRONZE (
+CREATE TABLE IF NOT EXISTS BRONZE.MATCHES_SUMMARY_BRONZE (
     -- Source columns
-    MATCH_ID        VARCHAR(255) NOT NULL,
-    GAME_DURATION   NUMBER(38,0),
-    PATCH_VERSION   NUMBER(38,0),
-    WINNING_TEAM    NUMBER(38,0),
-    GAME_DATE       VARCHAR(255),
-    GAME_VERSION    VARCHAR(255),
-    GAME_MODE       VARCHAR(255),
-    QUEUE_ID        NUMBER(38,0),
-    REGION          VARCHAR(255),
-    AVERAGE_RANK    VARCHAR(255),
-    BLUE_BANS       VARCHAR(255),
-    RED_BANS        VARCHAR(255),
+    MATCH_ID        VARCHAR NOT NULL,
+    GAME_DURATION   VARCHAR,
+    PATCH_VERSION   VARCHAR,
+    WINNING_TEAM    VARCHAR,
+    GAME_DATE       VARCHAR,
+    GAME_VERSION    VARCHAR,
+    GAME_MODE       VARCHAR,
+    QUEUE_ID        VARCHAR,
+    REGION          VARCHAR,
+    AVERAGE_RANK    VARCHAR,
+    BLUE_BANS       VARCHAR,
+    RED_BANS        VARCHAR,
     -- Load Metadata
     LDTS            TIMESTAMP_NTZ(9) NOT NULL,
     FILE_NAME       VARCHAR(255) NOT NULL,
@@ -32,7 +32,7 @@ COMMENT = '[BRONZE] Raw match summary. Loaded via MATCHES_SUMMARY_PP from @MATCH
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STREAM BRONZE.MATCHES_SUMMARY_BRONZE_STM
+CREATE STREAM IF NOT EXISTS BRONZE.MATCHES_SUMMARY_BRONZE_STM
     ON TABLE BRONZE.MATCHES_SUMMARY_BRONZE
     COMMENT = 'MATCHES_SUMMARY_BRONZE delta --> BRONZE_TO_SILVER_MATCHES_TASK --> MATCHES_SUMMARY_SILVER';
 
@@ -40,7 +40,7 @@ CREATE OR REPLACE STREAM BRONZE.MATCHES_SUMMARY_BRONZE_STM
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for match summary CSVs
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STAGE BRONZE.MATCHES_SUMMARY_STG
+CREATE STAGE IF NOT EXISTS BRONZE.MATCHES_SUMMARY_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for match-level summary CSVs. Expected file: matches_YYYYMMDD.csv';
@@ -48,7 +48,7 @@ CREATE OR REPLACE STAGE BRONZE.MATCHES_SUMMARY_STG
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PIPE BRONZE.MATCHES_SUMMARY_PP
+CREATE PIPE IF NOT EXISTS BRONZE.MATCHES_SUMMARY_PP
 COMMENT = 'Match summary ingestion. Ingest frequency --> Daily.'
 AS
 COPY INTO BRONZE.MATCHES_SUMMARY_BRONZE
@@ -72,4 +72,22 @@ FROM (
         'League Client Daily Logger'
     FROM @BRONZE.MATCHES_SUMMARY_STG
 )
-ON_ERROR = 'CONTINUE';
+ON_ERROR = 'SKIP_FILE_10%';
+
+
+-------------------------------------------------------------------------------------------
+    -- 5. _MATCHES_SUMMARY_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW BRONZE._MATCHES_SUMMARY_LOAD_ERRORS AS
+SELECT
+    FILE_NAME,
+    LAST_LOAD_TIME,
+    ROW_COUNT,
+    (ROW_PARSED - ROW_COUNT) AS ROWS_REJECTED,
+    ERROR_COUNT,
+    FIRST_ERROR_MESSAGE
+FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+    TABLE_NAME => 'BRONZE.MATCHES_SUMMARY_BRONZE',
+    START_TIME => DATEADD(DAY, -30, CURRENT_TIMESTAMP())
+))
+WHERE ERROR_COUNT > 0;

@@ -4,9 +4,9 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Champions reference lookup
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE BRONZE.CHAMPIONS_REF_BRONZE (
-    CHAMPION_ID    NUMBER(38,0) NOT NULL,
-    CHAMPION_NAME  VARCHAR(255),
+CREATE TABLE IF NOT EXISTS BRONZE.CHAMPIONS_REF_BRONZE (
+    CHAMPION_ID    VARCHAR NOT NULL,
+    CHAMPION_NAME  VARCHAR,
     -- Load Metadata
     LDTS            TIMESTAMP_NTZ(9) NOT NULL,
     FILE_NAME       VARCHAR(255) NOT NULL,
@@ -21,7 +21,7 @@ COMMENT = '[BRONZE] Champion reference lookup. Loaded via CHAMPIONS_REF_PP from 
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STREAM BRONZE.CHAMPIONS_REF_BRONZE_STM
+CREATE STREAM IF NOT EXISTS BRONZE.CHAMPIONS_REF_BRONZE_STM
     ON TABLE BRONZE.CHAMPIONS_REF_BRONZE
     COMMENT = 'CHAMPIONS_REF_BRONZE delta --> BRONZE_TO_SILVER_CHAMPIONS_TASK --> CHAMPIONS_REF_SILVER';
 
@@ -29,7 +29,7 @@ CREATE OR REPLACE STREAM BRONZE.CHAMPIONS_REF_BRONZE_STM
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for champions reference CSV
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE STAGE BRONZE.CHAMPIONS_REF_STG
+CREATE STAGE IF NOT EXISTS BRONZE.CHAMPIONS_REF_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for champion reference CSV. Expected file: champions_ref.csv';
@@ -37,7 +37,7 @@ CREATE OR REPLACE STAGE BRONZE.CHAMPIONS_REF_STG
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PIPE BRONZE.CHAMPIONS_REF_PP
+CREATE PIPE IF NOT EXISTS BRONZE.CHAMPIONS_REF_PP
 COMMENT = 'Champion reference lookup. Ingest frequency --> Every patch updates.'
 AS
 COPY INTO BRONZE.CHAMPIONS_REF_BRONZE
@@ -51,4 +51,22 @@ FROM (
         'League Static Data'
     FROM @BRONZE.CHAMPIONS_REF_STG
 )
-ON_ERROR = 'CONTINUE';
+ON_ERROR = 'SKIP_FILE_10%';
+
+
+-------------------------------------------------------------------------------------------
+    -- 5. _CHAMPIONS_REF_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
+-------------------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW BRONZE._CHAMPIONS_REF_LOAD_ERRORS AS
+SELECT
+    FILE_NAME,
+    LAST_LOAD_TIME,
+    ROW_COUNT,
+    (ROW_PARSED - ROW_COUNT) AS ROWS_REJECTED,
+    ERROR_COUNT,
+    FIRST_ERROR_MESSAGE
+FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+    TABLE_NAME => 'BRONZE.CHAMPIONS_REF_BRONZE',
+    START_TIME => DATEADD(DAY, -30, CURRENT_TIMESTAMP())
+))
+WHERE ERROR_COUNT > 0;
