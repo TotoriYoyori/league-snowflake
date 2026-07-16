@@ -6,9 +6,9 @@ USE SCHEMA SILVER;
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW SILVER.ITEMS_REF_BRONZE_STM_TO_SILVER AS
 SELECT
-    ITEM_ID,
-    TRIM(ITEM_NAME) AS ITEM_NAME,
-    ITEM_CATEGORY
+    TRY_TO_NUMBER(ITEM_ID) AS ITEM_ID,
+    NULLIFY_OVERSIZED(TRIM(ITEM_NAME), 255) AS ITEM_NAME,
+    NULLIFY_OVERSIZED(TRIM(ITEM_CATEGORY), 255) AS ITEM_CATEGORY
 FROM BRONZE.ITEMS_REF_BRONZE_STM
 ;
 
@@ -16,22 +16,23 @@ FROM BRONZE.ITEMS_REF_BRONZE_STM
 -------------------------------------------------------------------------------------------
     -- 2. SILVER TABLE: One row per item. PK on ITEM_ID.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SILVER.ITEMS_REF_SILVER (
+CREATE TABLE IF NOT EXISTS SILVER.ITEMS_REF_SILVER (
     ITEM_ID       NUMBER(38,0) NOT NULL,
     ITEM_NAME     VARCHAR(255),
     ITEM_CATEGORY VARCHAR(255),
-    
+
     CONSTRAINT ITEMS_REF_SILVER_PKEY PRIMARY KEY (ITEM_ID)
 )
-COMMENT = '[SILVER] Cleaned item reference. Deduped by name, HTML names extracted.';
+COMMENT = '[SILVER] Cleaned item reference.';
 
 
 -------------------------------------------------------------------------------------------
     -- 3. TASK: Merge new/changed rows from cleaning view into ITEMS_REF_SILVER
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TASK SILVER.BRONZE_TO_SILVER_ITEMS_TASK
+CREATE TASK IF NOT EXISTS SILVER.BRONZE_TO_SILVER_ITEMS_TASK
     WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
+    SUSPEND_TASK_AFTER_NUM_FAILURES = 3
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.ITEMS_REF_BRONZE_STM')
 AS
 MERGE INTO SILVER.ITEMS_REF_SILVER AS tgt
@@ -53,22 +54,20 @@ WHEN NOT MATCHED THEN
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW SILVER.CHAMPIONS_REF_BRONZE_STM_TO_SILVER AS
 SELECT
-    CHAMPION_ID,
-    -- Inserts space before uppercase letters that follow lowercase, e.g.:
-    -- 'TwistedFate' --> 'Twisted Fate', 'MissFortune' --> 'Miss Fortune'
-    TRIM(REGEXP_REPLACE(
-        CHAMPION_NAME, '([a-z])([A-Z])', '\\1 \\2'
-    )) AS CHAMPION_NAME
+    TRY_TO_NUMBER(CHAMPION_ID) AS CHAMPION_ID,
+    NULLIFY_OVERSIZED(
+        PASCAL_TO_TITLE_CASE(CHAMPION_NAME)
+    , 64) AS CHAMPION_NAME
 FROM BRONZE.CHAMPIONS_REF_BRONZE_STM;
 
 
 -------------------------------------------------------------------------------------------
     -- 5. SILVER TABLE: One row per champion. PK on CHAMPION_ID.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SILVER.CHAMPIONS_REF_SILVER (
+CREATE TABLE IF NOT EXISTS SILVER.CHAMPIONS_REF_SILVER (
     CHAMPION_ID    NUMBER(38,0) NOT NULL,
-    CHAMPION_NAME  VARCHAR(255),
-    
+    CHAMPION_NAME  VARCHAR(64),
+
     CONSTRAINT CHAMPIONS_REF_SILVER_PKEY PRIMARY KEY (CHAMPION_ID)
 )
 COMMENT = '[SILVER] Cleaned champion reference. PascalCase names split to Title Case.';
@@ -77,9 +76,10 @@ COMMENT = '[SILVER] Cleaned champion reference. PascalCase names split to Title 
 -------------------------------------------------------------------------------------------
     -- 6. TASK: Merge new/changed rows from cleaning view into CHAMPIONS_REF_SILVER
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TASK SILVER.BRONZE_TO_SILVER_CHAMPIONS_TASK
+CREATE TASK IF NOT EXISTS SILVER.BRONZE_TO_SILVER_CHAMPIONS_TASK
     WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
+    SUSPEND_TASK_AFTER_NUM_FAILURES = 3
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.CHAMPIONS_REF_BRONZE_STM')
 AS
 MERGE INTO SILVER.CHAMPIONS_REF_SILVER AS tgt
