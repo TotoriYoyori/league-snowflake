@@ -17,7 +17,7 @@ That's it. Everything else runs inside Snowflake.
 
 ---
 
-## Create the Workspace
+## 01. Create the Workspace
 
 First, you'll connect this repo to Snowflake as a **Workspace** so you can run the SQL files directly.
 
@@ -35,11 +35,13 @@ https://github.com/TotoriYoyori/league-snowflake
    * Name: `GITHUB_TOTORI_YOYORI`
    * Allowed prefix: `https://github.com/TotoriYoyori/`
 5. Select **Public Repository**
-6. Click **Create**
+6. 👉 **Click Create**
 
 > **Warning:** Keep the Workspace name exactly `league-snowflake` (Snowsight defaults to this from the repo URL,
 don't rename it!). Every `EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/...'` 
-call in `01_deploy.sql` depends on this name.
+call in `01_deploy.sql` depends on this name. See picture below for example of this name.
+
+![Git Workspace connected live to the league-snowflake GitHub repo](../assets/img/git_workspace.png)
 
 You'll now see every file in the repo in your Workspace file tree.
 
@@ -47,9 +49,9 @@ You'll now see every file in the repo in your Workspace file tree.
 any `.sql` file directly from the tree. 
 
 ---
-## Deploy the Pipeline
+## 02. Deploy the Pipeline
 
-Open `setup/01_deploy.sql` from the file tree, then **Run All**.
+👉 **Open `setup/01_deploy.sql` from the file tree, then Run All.**
 
 ```sql
 -- That's it. One file deploys everything:
@@ -65,13 +67,13 @@ Open `setup/01_deploy.sql` from the file tree, then **Run All**.
 
 ---
 
-## Download the Data
+## 03. Download the Data
 
 Go to the **GitHub releases** page:
 
 👉 **https://github.com/TotoriYoyori/league-snowflake/releases/tag/sample**
 
-Download these 5 files under **Assets**:
+👉 **Download these 5 files under Assets:**
 
 | File | Rows | Size |
 |------|------|------|
@@ -83,7 +85,7 @@ Download these 5 files under **Assets**:
 
 ---
 
-## Upload to the Seed Stage
+## 04. Upload to the Seed Stage
 
 Now you'll put those files into Snowflake.
 
@@ -91,7 +93,7 @@ In Snowsight, in the sidebar to the left, navigate to:
 
 **Catalog → Databases → LEAGUE_RECORDS → SEED → Stages → SEED_UPLOAD_STG**
 
-Click **+ Files** and upload all 5 files you just downloaded.
+👉 **Click + Files and upload all 5 files you just downloaded.**
 
 That's the only manual step. Everything after this is automated SQL.
 
@@ -103,9 +105,9 @@ step (next) reports a file missing right after you just uploaded it, wait a mome
 the upload failed.
 
 ---
-## Load the Seed Data
+## 05. Load the Seed Data
 
-Open `setup/02_seed_source.sql` and **Run All**.
+👉 **Open `setup/02_seed_source.sql` and Run All.**
 
 Here's what happens under the hood:
 
@@ -129,6 +131,8 @@ SEED_ITEMS_REF          | 635
 SEED_CHAMPIONS_REF      | 173
 ```
 
+![SEED schema populated with all 6 tables](../assets/img/seed_table.png)
+
 4. **Reference bootstrap**: The two small reference tables get loaded one time into their bronze table directly.
 
 5. **Kickstart**: calls `SEED.SIMULATE_DAILY_LOAD()` once, staging the first simulated day's matches/players/intervals 
@@ -138,9 +142,9 @@ straight into Bronze. Tasks aren't active yet (next step), so this data just sit
 missing files first. The COPY INTO will succeed on empty stage paths without error. It'll just load zero rows silently.
 
 ---
-## Activate the Tasks
+## 06. Activate the Tasks
 
-Open `setup/03_activate_tasks.sql` and **Run All**.
+👉 **Open `setup/03_activate_tasks.sql` and Run All.**
 
 This resumes all the tasks that move data from bronze → silver, since all tasks start suspended after first created.
 
@@ -160,9 +164,61 @@ the moment they're resumed. Give it a minute or two for the first scheduled run 
 [Check That It Works](#check-that-it-works) below.
 
 ---
-## Check That It Works
+## 07. Deploy the Streamlit Apps
 
-Run this single query to verify data is flowing through every layer at once:
+👉 **Open `setup/04_create_streamlit_app.sql` and Run All**, same context as before (`ACCOUNTADMIN`, a warehouse selected).
+
+### Find your apps
+In Snowsight, in the sidebar: **Projects → Streamlit**, or run:
+
+```sql
+SHOW STREAMLITS IN DATABASE LEAGUE_RECORDS;
+```
+
+![All three Streamlit apps registered in Snowsight](../assets/img/streamlit_app_browse.png)
+
+Click any app name to open it. Each opens against the `STREAMLIT_WH` warehouse created above.
+First load may take a few seconds for the warehouse to figure things out. Also note that **the pipeline needs
+time to process new data**, so it might take up to 5 minutes before your app picks up new data and loads correctly.
+
+----
+# How to Use
+This section covers the following:
+1. How to use the simulated daily ingestion system
+2. Verify that the pipeline is working
+3. How to rebuild the pipeline
+
+## Simulate Daily Ingestion
+
+The seed tables hold the *full* historical dataset. The `SIMULATE_DAILY_LOAD()` procedure stages **one day at a time**.
+
+Note that for this pipeline the **latest date is ingested first then going backward**. This is because the number of records
+are sparse on older dates unfortunately, while more recent dates allows you to ingest more records, but the idea of daily simulation 
+is the same.
+
+### 👉 Whenever you want to ingest 'another day worth of data', open `run_daily_ingestion.sql` at the workspace root and click **Run All**.
+
+That's the only file you need going forward.
+
+> **Info:** You will have already loaded one day back in [Load the Seed Data](#05-load-the-seed-data)!
+
+Output:
+```
+Loaded date 2026-01-30. Next: 2026-01-29
+```
+
+![run_daily_ingestion.sql output showing the loaded date and next date](../assets/img/success_simulated_load.png)
+
+Run it again → next day loads. And again. Keep going as many days as you want.
+
+`SEED_LOAD_STATE` after several runs. `CURRENT_LOAD_DATE` visibly earlier than `MAX_DATE`, proof the simulation advances over repeated runs, not just once:
+
+![SEED_LOAD_STATE table after several ingestion runs](../assets/img/simulated_history.png)
+
+## Check That It Works
+Give it 1-5 minutes for the pipeline to load data through each layer.
+
+👉 **Run this single query to verify data is flowing through every layer at once:**
 
 ```sql
 -- One grid: bronze landed it, silver cleaned it, gold aggregated it, seed tracks where we are.
@@ -211,6 +267,10 @@ FROM (
 ) AS T
 ORDER BY SEQ;
 ```
+You should be seeing something like this, with perhaps different row count numbers from mine (since my version here
+has simulated daily ingestion by couple days ahead)
+
+![Check that it works — Bronze, Silver, Gold, and Seed row counts in one grid](assets/img/check_that_it_works.png)
 
 > **Tip:** If silver tables are empty but bronze has data, wait 1-2 minutes for the tasks to fire. You can check task history with:
 >
@@ -236,88 +296,12 @@ before opening a Streamlit app below), force a refresh instead of waiting by **r
 > ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.DIFF_INTERVAL_STATE REFRESH;
 > ```
 
----
-## Deploy the Streamlit Apps
+## Rebuilding Pipeline
+You can re-run `01_deploy.sql` through `04_create_streamlit_app.sql` in sequence to 
+rebuild everything from scratch at any time. 
 
-Open `setup/04_create_streamlit_app.sql` and **Run All**, same context as before (`ACCOUNTADMIN`, a warehouse selected).
+Note that `01_deploy.sql` starts with `CREATE OR REPLACE DATABASE`, which **drops all existing pipeline objects** 
+as well as **any current data stored within**. Unless you know what you are doing, or are looking to do a rebuild,
+I would stay away from `01_deploy.sql` beyond the first time you run it.
 
-```sql
--- One file deploys the whole Streamlit layer:
--- ✓ STREAMLIT_WH: dedicated XSMALL warehouse for app execution
--- ✓ GITHUB_TOTORI_YOYORI API integration (read-only, scoped to the TotoriYoyori GitHub org)
--- ✓ Three Git repositories, one per app, fetched from their `snowflake` branch
--- ✓ Three Streamlit apps registered under LEAGUE_RECORDS.GOLD
-```
-
-| App | Snowflake object | What it shows |
-|---|---|---|
-| Itemization Explorer | `LEAGUE_RECORDS.GOLD.ITEM_BROWSER` | Item build stats and buy/win rates per champion |
-| Role Importance | `LEAGUE_RECORDS.GOLD.ROLE_IMPORTANCE` | Lane gold-diff win coefficients and a live win-probability predictor |
-| Pipeline Monitor | `LEAGUE_RECORDS.GOLD.PIPELINE_MONITOR` | Live health checks across Seed/Bronze/Silver/Gold |
-
-> **Tip:** If you want data current to the second before opening an app, force-refresh Gold first, 
-see the warning box in [Check That It Works](#check-that-it-works) above.
-
-### Find your apps
-In Snowsight, in the sidebar: **Projects → Streamlit**, or run:
-
-```sql
-SHOW STREAMLITS IN DATABASE LEAGUE_RECORDS;
-```
-
-Click any app name to open it. Each opens against the `STREAMLIT_WH` warehouse created above.
-First load may take a few seconds for the warehouse to figure things out.
-
----
-## Simulate Daily Ingestion
-
-The seed tables hold the *full* historical dataset. The `SIMULATE_DAILY_LOAD()` procedure stages **one day at a time**.
-
-Note that for this pipeline the **latest date is ingested first then going backward**. This is because the number of records
-are sparse on older dates, while more recent dates allows you to ingest more records, but the idea of daily simulation 
-is the same.
-
-### 👉 Whenever you want to ingest 'another day worth of data', open `run_daily_ingestion.sql` at the workspace rootand click **Run All**.
-
-That's the only file you need going forward.
-
-> **Info:** You will have already loaded one day back in [Load the Seed Data](#load-the-seed-data)!
-
-Output:
-```
-Loaded date 2026-01-30. Next: 2026-01-29
-```
-
-Run it again → next day loads. And again. Keep going as many days as you want.
-
-**What happens each time you run it:**
-
-1. Picks the next date from the seed
-2. Stages CSVs for matches, players, and intervals
-3. Refreshes all 3 bronze pipes
-4. Advances the date pointer
-
-> **Info:** The procedure tracks its own state in `SEED.SEED_LOAD_STATE`. It stops automatically when all 
-dates are exhausted. You'll see a message saying so.
-
----
-## Recap
-
-Here's the full flow you just set up:
-
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────────┐
-│   SEED   │────▶│  BRONZE  │────▶│  SILVER  │────▶│   GOLD   │────▶│  STREAMLIT   │
-│          │     │          │     │          │     │          │     │              │
-│ Full CSV │     │ Raw +    │     │ Cleaned  │     │Aggregated│     │ 3 apps, read │
-│ dataset  │     │ metadata │     │ enriched │     │ (dynamic)│     │ from Gold    │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘     └──────────────┘
-      │                │                │                │
- SIMULATE_        Pipes load       Tasks merge      Self-refreshes
- DAILY_LOAD()     from stage       from stream      on TARGET_LAG
-```
-
-Each layer is independent. You can re-run `01_deploy.sql` through `04_create_streamlit_app.sql` in sequence to 
-rebuild everything from scratch at any time. Note that `01_deploy.sql` starts with `CREATE OR REPLACE DATABASE`, 
-which **drops all existing data**, including your simulated ingestion progress in `SEED.SEED_LOAD_STATE`. 
-Re-seed and re-run `run_daily_ingestion.sql` after a rebuild if you want data back.
+You will have to reupload the seed .csv files to the stage after a rebuild if you want data back.
