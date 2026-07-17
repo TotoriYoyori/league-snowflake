@@ -1,47 +1,48 @@
 USE SCHEMA SILVER;
 
-
+-- NUTS NULL UNTYPABLE TOOWEIRD SAFE
 -------------------------------------------------------------------------------------------
     -- 1. CLEANING VIEW: drop GAME_MODE/QUEUE_ID/REGION/PATCH_VERSION + below edits
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW SILVER.MATCHES_SUMMARY_BRONZE_STM_TO_SILVER AS
 WITH CLEANING AS (
     SELECT
-        UPPER(TRIM(MATCH_ID)) AS MATCH_ID,
-        -- Nullify negative game durations
-        CASE
-            WHEN TRY_TO_NUMBER(GAME_DURATION) <= 0 THEN NULL
-            ELSE TRY_TO_NUMBER(GAME_DURATION)
-        END AS GAME_DURATION,
+        UPPER(MATCH_ID) AS MATCH_ID,
+        -- Cap game durations to 0+
+        VALID_NUM_RANGE(
+            ROUND(TRY_TO_NUMBER(GAME_DURATION), 0),
+            0,
+            24 * 60 * 60
+        ) AS GAME_DURATION,
         -- Standardize team's name to Blue or Red
-        CASE TRIM(WINNING_TEAM)
+        CASE WINNING_TEAM
             WHEN '100' THEN 'Blue'
             WHEN '200' THEN 'Red'
             ELSE NULL
         END AS WINNING_TEAM,
-        TRY_TO_TIMESTAMP(GAME_DATE) AS GAME_DATE,
-        -- Ensure good game version e.g. 16.2.741.3171
-        CASE
-            WHEN TRIM(GAME_VERSION) REGEXP '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$'
-                THEN TRIM(GAME_VERSION)
-            ELSE NULL
-        END AS GAME_VERSION,
-        INITCAP(TRIM(AVERAGE_RANK)) AS AVERAGE_RANK,
+        -- Bound valid date matches only
+        VALID_TS_RANGE(
+            TRY_TO_TIMESTAMP(GAME_DATE),
+            '2009-10-27'::TIMESTAMP_NTZ, -- When LoL was released
+            CURRENT_TIMESTAMP()
+        ) AS GAME_DATE,
+        GAME_VERSION,
+        INITCAP(AVERAGE_RANK) AS AVERAGE_RANK,
         -- Replace -1 sentinel in ban sequences with 0 for champions reference
-        TRIM(REPLACE(BLUE_BANS, '-1', '0')) AS BLUE_BANS,
-        TRIM(REPLACE(RED_BANS, '-1', '0')) AS RED_BANS
+        REPLACE(BLUE_BANS, '-1', '0') AS BLUE_BANS,
+        REPLACE(RED_BANS, '-1', '0') AS RED_BANS
     FROM BRONZE.MATCHES_SUMMARY_BRONZE_STM
 )
 
 SELECT
-    MATCH_ID,
+    NULLIFY_CAPLEN(MATCH_ID, 64) AS MATCH_ID,
     GAME_DURATION,
-    WINNING_TEAM,
+    NULLIFY_CAPLEN(WINNING_TEAM, 16) AS WINNING_TEAM,
     GAME_DATE,
-    NULLIFY_OVERSIZED(GAME_VERSION, 64) AS GAME_VERSION,
-    NULLIFY_OVERSIZED(AVERAGE_RANK, 64) AS AVERAGE_RANK,
-    NULLIFY_OVERSIZED(BLUE_BANS, 64) AS BLUE_BANS,
-    NULLIFY_OVERSIZED(RED_BANS, 64) AS RED_BANS
+    NULLIFY_CAPLEN(GAME_VERSION, 64) AS GAME_VERSION,
+    NULLIFY_CAPLEN(AVERAGE_RANK, 16) AS AVERAGE_RANK,
+    NULLIFY_CAPLEN(BLUE_BANS, 64) AS BLUE_BANS,
+    NULLIFY_CAPLEN(RED_BANS, 64) AS RED_BANS
 FROM CLEANING
 ;
 
@@ -55,7 +56,7 @@ CREATE TABLE IF NOT EXISTS SILVER.MATCHES_SUMMARY_SILVER (
     WINNING_TEAM    VARCHAR(16),
     GAME_DATE       TIMESTAMP_NTZ,
     GAME_VERSION    VARCHAR(64),
-    AVERAGE_RANK    VARCHAR(64),
+    AVERAGE_RANK    VARCHAR(16),
     BLUE_BANS       VARCHAR(64),
     RED_BANS        VARCHAR(64),
     CONSTRAINT MATCHES_SUMMARY_SILVER_PKEY PRIMARY KEY (MATCH_ID)

@@ -10,7 +10,7 @@ CREATE OR REPLACE TABLE SILVER.TEAM_INTERVAL_SILVER (
     -- Natural composite key
     MATCH_ID                VARCHAR(64) NOT NULL,
     TEAM                    VARCHAR(4) NOT NULL,
-    MINUTE                  NUMBER(3,0),
+    MINUTE                  NUMBER(38,0) NOT NULL,
     -- Team Objective Stats
     TEAM_KILLS              NUMBER(38,0),
     TEAM_INHIBITORS         NUMBER(38,0),

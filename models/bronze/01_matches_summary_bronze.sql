@@ -6,7 +6,7 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS BRONZE.MATCHES_SUMMARY_BRONZE (
     -- Source columns
-    MATCH_ID        VARCHAR NOT NULL,
+    MATCH_ID        VARCHAR,
     GAME_DURATION   VARCHAR,
     PATCH_VERSION   VARCHAR,
     WINNING_TEAM    VARCHAR,

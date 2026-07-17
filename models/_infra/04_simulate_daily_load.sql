@@ -32,7 +32,7 @@ BEGIN
                 s.AVERAGE_RANK, 
                 s.BLUE_BANS, 
                 s.RED_BANS
-            FROM SEED.SEED_MATCHES_SUMMARY s
+            FROM SEED.SEED_MATCHES_SUMMARY AS s
             JOIN SEED._SEED_MATCH_DATE_INDEX AS idx 
                 ON s.MATCH_ID = idx.MATCH_ID
             WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''

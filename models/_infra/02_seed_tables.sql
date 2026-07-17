@@ -5,7 +5,7 @@ USE SCHEMA SEED;
     -- 1. SEED_MATCHES_SUMMARY: Source match-level dataset
 -------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS SEED.SEED_MATCHES_SUMMARY (
-    MATCH_ID        VARCHAR NOT NULL,
+    MATCH_ID        VARCHAR,
     GAME_DURATION   VARCHAR,
     PATCH_VERSION   VARCHAR,
     WINNING_TEAM    VARCHAR,
@@ -25,8 +25,8 @@ COMMENT = 'Source matches summary dataset. One record --> One match.';
     -- 2. SEED_PLAYERS_SUMMARY: Source player-level dataset
 -------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS SEED.SEED_PLAYERS_SUMMARY (
-    ID                   VARCHAR NOT NULL,
-    MATCH_ID             VARCHAR NOT NULL,
+    ID                   VARCHAR,
+    MATCH_ID             VARCHAR,
     PARTICIPANT_ID       VARCHAR,
     TEAM_ID              VARCHAR,
     CHAMPION             VARCHAR,
@@ -40,10 +40,10 @@ COMMENT = 'Source players summary dataset. One record --> One player per match.'
     -- 3. SEED_MATCH_INTERVALS: Full interval-level dataset (existing data, renamed)
 -------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS SEED.SEED_MATCH_INTERVALS (
-    ID              VARCHAR NOT NULL,
-    MATCH_ID        VARCHAR NOT NULL,
-    PLAYER_ID       VARCHAR NOT NULL,
-    MINUTE          VARCHAR NOT NULL,
+    ID              VARCHAR,
+    MATCH_ID        VARCHAR,
+    PLAYER_ID       VARCHAR,
+    MINUTE          VARCHAR,
     CURRENT_GOLD    VARCHAR,
     TOTAL_GOLD      VARCHAR,
     CS              VARCHAR,
@@ -84,7 +84,7 @@ COMMENT = 'Source match intervals dataset. One record --> One 5 minute snapshot 
     -- 4. SEED_ITEMS_REF: Item ID to name lookup and its categorization
 -------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS SEED.SEED_ITEMS_REF (
-    ITEM_ID       VARCHAR NOT NULL,
+    ITEM_ID       VARCHAR,
     ITEM_NAME     VARCHAR,
     ITEM_CATEGORY VARCHAR
 )
@@ -94,7 +94,7 @@ COMMENT = 'Source item reference lookup. One record --> One item and its categor
     -- 5. SEED_CHAMPIONS_REF: Champion ID to name lookup
 -------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS SEED.SEED_CHAMPIONS_REF (
-    CHAMPION_ID    VARCHAR NOT NULL,
+    CHAMPION_ID    VARCHAR,
     CHAMPION_NAME  VARCHAR
 )
 COMMENT = 'Source champion reference lookup: One record --> One champion.';
