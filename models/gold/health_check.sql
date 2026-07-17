@@ -391,10 +391,6 @@ FROM (
 )
 WHERE STATE NOT IN ('SUCCEEDED')
 ;
-
--------------------------------------------------------------------------------------------
--- REPORT — summary grid (one row per check)
--------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------
 -- REPORT — summary grid (one row per check)
 --   STATUS: PASS = clean. FAIL = pipeline defect (data is wrong).
@@ -481,24 +477,5 @@ SELECT
     'FAILS=' || SUM(IFF(STATUS = 'FAIL', 1, 0))
         || '  REVIEWS=' || SUM(IFF(STATUS = 'REVIEW', 1, 0))
 FROM GRID
-ORDER BY CHECK_ID;
-
--------------------------------------------------------------------------------------------
--- DRILL-DOWN: Uncomment and run after the script, same session
--------------------------------------------------------------------------------------------
--- WITH MISSING_MATCHES AS (
---     SELECT DISTINCT SUBSTRING(OFFENDING_KEY, 1, 15) AS MATCH_ID
---     FROM _DQ_FAILURES
---     WHERE CHECK_ID = 3
--- )
--- SELECT *
--- FROM BRONZE.MATCH_INTERVALS_BRONZE AS SS
--- JOIN MISSING_MATCHES AS MM
---     ON MM.MATCH_ID = SS.MATCH_ID
--- ;
-SELECT GC.*
-FROM _DQ_FAILURES AS DQ
-JOIN GOLD.CHAMPION_OVERVIEW AS GC
-    ON GC.CHAMPION_ID = DQ.OFFENDING_KEY
-WHERE CHECK_ID = 6
+ORDER BY CHECK_ID
 ;

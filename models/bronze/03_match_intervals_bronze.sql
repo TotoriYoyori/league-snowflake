@@ -63,7 +63,7 @@ COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via MATCH_INTERVALS_PP 
 -------------------------------------------------------------------------------------------
 CREATE STREAM IF NOT EXISTS BRONZE.MATCH_INTERVALS_BRONZE_STM
     ON TABLE BRONZE.MATCH_INTERVALS_BRONZE
-    COMMENT = 'MATCH_INTERVALS_BRONZE delta --> BRONZE_TO_SILVER_INTERVALS_TASK --> MATCH_INTERVALS_SILVER';
+    COMMENT = 'MATCH_INTERVALS_BRONZE delta --> BRONZE_TO_SILVER_INTERVALS_TASK';
 
 
 -------------------------------------------------------------------------------------------

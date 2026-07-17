@@ -7,13 +7,13 @@ USE SCHEMA SILVER;
     -- 01. Editted: 2026/06/25 12:58 
     -- ITEM_0 -> 7 as VARCHAR(255) presented as name --> Is numeric type to keep base ID 
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SILVER.PLAYER_INTERVAL_SILVER (
+CREATE TABLE IF NOT EXISTS SILVER.PLAYER_INTERVAL_SILVER (
     -- Primary key
     ID                  NUMBER(38,0) NOT NULL,
     -- Natural composite key
     MATCH_ID            VARCHAR(64) NOT NULL,
     PARTICIPANT_POS_ID  NUMBER(38,0) NOT NULL,
-    TEAM                VARCHAR(4) NOT NULL,
+    TEAM                VARCHAR(16) NOT NULL,
     MINUTE              NUMBER(38,0) NOT NULL,
     -- Economy
     CURRENT_GOLD        NUMBER(38,0),

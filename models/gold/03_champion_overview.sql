@@ -1,5 +1,6 @@
-
 USE SCHEMA GOLD;
+
+
 -------------------------------------------------------------------------------------------
     -- DESIGN NOTES:
     --     To properly inform win rates, all remakes/unfinished games (GAME_DURATION < 300s)

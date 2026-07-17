@@ -39,28 +39,37 @@ WHERE IR.ITEM_NAME IS NULL
     -- 04. Task handles dedup and propagate new data downstream
 -------------------------------------------------------------------------------------------
 INSERT INTO BRONZE.ITEMS_REF_BRONZE (
-    ITEM_ID, 
-    ITEM_NAME, 
-    ITEM_CATEGORY,
-    LDTS,
-    FILE_NAME,
-    FILE_ROW_NUMBER,
-    RSRC
+    ITEM_ID, ITEM_NAME, ITEM_CATEGORY, LDTS, FILE_NAME, FILE_ROW_NUMBER, RSRC
 )
-VALUES
-    (2510, 'Dusk and Dawn', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 1, 'Manual backfill'),
-    (8010, 'Bloodletter''s Curse', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 2, 'Manual backfill'),
-    (3097, 'Stormrazor', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 3, 'Manual backfill'),
-    (2517, 'Endless Hunger', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 4, 'Manual backfill'),
-    (2525, 'Protoplasm Harness', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 5, 'Manual backfill'),
-    (2522, 'Actualizer', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 6, 'Manual backfill'),
-    (2526, 'Whispering Circlet', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 7, 'Manual backfill'),
-    (3340, 'Stealth Ward', 'Trinket', CURRENT_TIMESTAMP(), '_NULL.csv', 8, 'Manual backfill'),
-    (2524, 'Bandlepipes', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 9, 'Manual backfill'),
-    (2512, 'Fiendhunter Bolts', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 10, 'Manual backfill'),
-    (2523, 'Hexoptics C44', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 11, 'Manual backfill'),
-    (2520, 'Bastionbreaker', 'Legendary', CURRENT_TIMESTAMP(), '_NULL.csv', 12, 'Manual backfill')
-;
+SELECT
+    v.ITEM_ID,
+    v.ITEM_NAME,
+    v.ITEM_CATEGORY,
+    CURRENT_TIMESTAMP(),
+    '_NULL.csv',
+    v.FILE_ROW_NUMBER,
+    'Manual backfill'
+FROM (
+    SELECT * FROM VALUES
+        (2510, 'Dusk and Dawn',          'Legendary', 1),
+        (8010, 'Bloodletter''s Curse',   'Legendary', 2),
+        (3097, 'Stormrazor',             'Legendary', 3),
+        (2517, 'Endless Hunger',         'Legendary', 4),
+        (2525, 'Protoplasm Harness',     'Legendary', 5),
+        (2522, 'Actualizer',             'Legendary', 6),
+        (2526, 'Whispering Circlet',     'Legendary', 7),
+        (3340, 'Stealth Ward',           'Trinket',   8),
+        (2524, 'Bandlepipes',            'Legendary', 9),
+        (2512, 'Fiendhunter Bolts',      'Legendary', 10),
+        (2523, 'Hexoptics C44',          'Legendary', 11),
+        (2520, 'Bastionbreaker',         'Legendary', 12)
+    AS v(ITEM_ID, ITEM_NAME, ITEM_CATEGORY, FILE_ROW_NUMBER)
+) AS v
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM BRONZE.ITEMS_REF_BRONZE AS tgt
+    WHERE tgt.ITEM_ID = v.ITEM_ID
+);
 
 -------------------------------------------------------------------------------------------
     -- VERIFY: Verify that BRONZE.ITEMS_REF_BRONZE have received the change and all downstream

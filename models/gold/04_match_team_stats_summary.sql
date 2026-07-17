@@ -1,4 +1,6 @@
 USE SCHEMA GOLD;
+
+
 -------------------------------------------------------------------------------------------
     -- DESIGN NOTES:
     --     WINNING_GOLD_DIFF reports the gold differential of whichever team won, so it's always

@@ -4,9 +4,10 @@ USE SCHEMA SILVER;
     -- TASK: Single task merges the shared cleaning view's delta into BOTH
     -- PLAYER_INTERVAL_SILVER and TEAM_INTERVAL_SILVER inside one explicit transaction. 
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TASK SILVER.BRONZE_TO_SILVER_INTERVALS_TASK
+CREATE TASK IF NOT EXISTS SILVER.BRONZE_TO_SILVER_INTERVALS_TASK
     WAREHOUSE = COMPUTE_WH
     SCHEDULE  = '1 MINUTE'
+    SUSPEND_TASK_AFTER_NUM_FAILURES = 3
     WHEN SYSTEM$STREAM_HAS_DATA('BRONZE.MATCH_INTERVALS_BRONZE_STM')
 AS
 EXECUTE IMMEDIATE $$

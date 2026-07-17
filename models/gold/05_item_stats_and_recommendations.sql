@@ -82,7 +82,7 @@ FLATTENED_ITEMS_WITH_REF AS (
             WHEN 'Boots'      THEN 5
             WHEN 'Epic'       THEN 6
             WHEN 'Legendary'  THEN 7
-            -- Excluding categories ('Others', 'Distributed', 'Legacy'). These do not get recommendations. 
+            -- Excluding categories ('Other', 'Distributed', 'Legacy'). These do not get recommendations.
             ELSE NULL
         END AS TIER_RANK
     FROM FLATTENED_ITEMS AS FI

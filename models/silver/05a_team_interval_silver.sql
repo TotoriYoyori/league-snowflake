@@ -4,12 +4,12 @@ USE SCHEMA SILVER;
     -- SILVER TABLE: Team-minute grain, deduplicated from the 5 identical player
     -- rows per team per minute. Surrogate numeric ID hashed from the natural key.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE TABLE SILVER.TEAM_INTERVAL_SILVER (
+CREATE TABLE IF NOT EXISTS SILVER.TEAM_INTERVAL_SILVER (
     -- Primary key
     ID                      NUMBER(38,0) NOT NULL,
     -- Natural composite key
     MATCH_ID                VARCHAR(64) NOT NULL,
-    TEAM                    VARCHAR(4) NOT NULL,
+    TEAM                    VARCHAR(16) NOT NULL,
     MINUTE                  NUMBER(38,0) NOT NULL,
     -- Team Objective Stats
     TEAM_KILLS              NUMBER(38,0),
