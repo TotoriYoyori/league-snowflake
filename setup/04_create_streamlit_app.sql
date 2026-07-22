@@ -74,7 +74,7 @@ ALTER STREAMLIT LEAGUE_RECORDS.GOLD.PIPELINE_MONITOR ADD LIVE VERSION FROM LAST;
 
 
 -------------------------------------------------------------------------------------------
--- HOW TO UPDATE: Run each of these query whenever you want to update each app. Because they are
+-- HOW TO UPDATE: Run each pair of these query whenever you want to update each app. Because they are
 -- from separate repos, you can update each at your own cadence. 
 -------------------------------------------------------------------------------------------
 -- ALTER GIT REPOSITORY LEAGUE_RECORDS.GOLD.ROLE_IMPORTANCE_ST_REPO FETCH;

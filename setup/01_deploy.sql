@@ -8,7 +8,7 @@
 -- data back.
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE DATABASE LEAGUE_RECORDS
-    COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo and standard League of Legends matches.';
+    COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo, Summoner's Rift LoL matches.';
 
 USE WAREHOUSE COMPUTE_WH;
 

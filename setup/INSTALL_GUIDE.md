@@ -204,7 +204,7 @@ That's the only file you need going forward.
 
 Output:
 ```
-Loaded date 2026-01-30. Next: 2026-01-29
+Loaded date 2026-01-28. Advanced to 2026-01-27 (min: 2024-02-21)
 ```
 
 ![run_daily_ingestion.sql output showing the loaded date and next date](../assets/img/success_simulated_load.png)

@@ -44,26 +44,7 @@ COPY INTO LEAGUE_RECORDS.SEED.SEED_CHAMPIONS_REF
 
 
 -------------------------------------------------------------------------------------------
--- 2. VERIFY ROW COUNTS
--------------------------------------------------------------------------------------------
-SELECT 'SEED_MATCHES_SUMMARY' AS TABLE_NAME, COUNT(*) AS ROW_COUNT
-FROM LEAGUE_RECORDS.SEED.SEED_MATCHES_SUMMARY
-    UNION ALL
-SELECT 'SEED_PLAYERS_SUMMARY', COUNT(*)
-FROM LEAGUE_RECORDS.SEED.SEED_PLAYERS_SUMMARY
-    UNION ALL
-SELECT 'SEED_MATCH_INTERVALS', COUNT(*)
-FROM LEAGUE_RECORDS.SEED.SEED_MATCH_INTERVALS
-    UNION ALL
-SELECT 'SEED_ITEMS_REF', COUNT(*)
-FROM LEAGUE_RECORDS.SEED.SEED_ITEMS_REF
-    UNION ALL
-SELECT 'SEED_CHAMPIONS_REF', COUNT(*)
-FROM LEAGUE_RECORDS.SEED.SEED_CHAMPIONS_REF;
-
-
--------------------------------------------------------------------------------------------
--- 3. ONE-TIME: STAGE REFERENCE DATA AND REFRESH REFERENCE PIPES
+-- 2. ONE-TIME: STAGE REFERENCE DATA AND REFRESH REFERENCE PIPES
 -------------------------------------------------------------------------------------------
 COPY INTO @LEAGUE_RECORDS.BRONZE.ITEMS_REF_STG/items_ref.csv
 FROM (
