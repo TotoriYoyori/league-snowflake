@@ -4,24 +4,21 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Raw match interval data with load metadata
 -------------------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS BRONZE.MATCH_INTERVALS_BRONZE (
-    -- Identifier
-    ID VARCHAR NOT NULL,
-    MATCH_ID VARCHAR NOT NULL,
-    PLAYER_ID VARCHAR NOT NULL,
-    -- Economy
-    MINUTE VARCHAR NOT NULL,
+CREATE TABLE IF NOT EXISTS BRONZE.INTERVALS (
+    -- Source
+    ID VARCHAR,
+    MATCH_ID VARCHAR,
+    PLAYER_ID VARCHAR,
+    MINUTE VARCHAR,
     CURRENT_GOLD VARCHAR,
     TOTAL_GOLD VARCHAR,
     CS VARCHAR,
     JUNGLE_CS VARCHAR,
     XP VARCHAR,
     LEVEL VARCHAR,
-    -- KDA
     KILLS VARCHAR,
     DEATHS VARCHAR,
     ASSISTS VARCHAR,
-    -- Itemization
     ITEM_0 VARCHAR,
     ITEM_1 VARCHAR,
     ITEM_2 VARCHAR,
@@ -29,7 +26,6 @@ CREATE TABLE IF NOT EXISTS BRONZE.MATCH_INTERVALS_BRONZE (
     ITEM_4 VARCHAR,
     ITEM_5 VARCHAR,
     ITEM_6 VARCHAR,
-    -- Team's Objective
     TEAM_KILLS VARCHAR,
     TEAM_INHIBITORS VARCHAR,
     TEAM_TOWERS VARCHAR,
@@ -43,44 +39,44 @@ CREATE TABLE IF NOT EXISTS BRONZE.MATCH_INTERVALS_BRONZE (
     TEAM_BARONS VARCHAR,
     TEAM_VOID_GRUBS VARCHAR,
     TEAM_HERALDS VARCHAR,
-    -- Stats Diff
     GOLD_DIFF VARCHAR,
     XP_DIFF VARCHAR,
     TEAM_GOLD_DIFF VARCHAR,
-    -- Load Metadata
+    -- Metadata
     LDTS TIMESTAMP_NTZ(9) NOT NULL,
     FILE_NAME VARCHAR(255) NOT NULL,
     FILE_ROW_NUMBER NUMBER(38,0) NOT NULL,
     RSRC VARCHAR(255) NOT NULL,
-    -- Constraints
-    CONSTRAINT MATCH_INTERVALS_BRONZE_PKEY PRIMARY KEY (ID)
+
+    CONSTRAINT BRONZE_INTERVALS_PKEY PRIMARY KEY (ID)
 )
-COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via MATCH_INTERVALS_PP from @MATCH_INTERVALS_STG.';
+COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via INTERVALS_PP from @INTERVALS_STG.';
 
 
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
-CREATE STREAM IF NOT EXISTS BRONZE.MATCH_INTERVALS_BRONZE_STM
-    ON TABLE BRONZE.MATCH_INTERVALS_BRONZE
-    COMMENT = 'MATCH_INTERVALS_BRONZE delta --> BRONZE_TO_SILVER_INTERVALS_TASK';
+CREATE STREAM IF NOT EXISTS BRONZE.INTERVALS_STM
+    ON TABLE BRONZE.INTERVALS
+    COMMENT = 'INTERVALS delta --> BRONZE_TO_SILVER_INTERVALS_TASK';
 
 
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for interval snapshot CSVs
 -------------------------------------------------------------------------------------------
-CREATE STAGE IF NOT EXISTS BRONZE.MATCH_INTERVALS_STG
+CREATE STAGE IF NOT EXISTS BRONZE.INTERVALS_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for per-minute interval snapshot CSVs. Expected file: intervals_YYYYMMDD.csv';
 
+
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
-CREATE PIPE IF NOT EXISTS BRONZE.MATCH_INTERVALS_PP
+CREATE PIPE IF NOT EXISTS BRONZE.INTERVALS_PP
 COMMENT = 'Match interval snapshot ingestion. Ingest frequency --> Daily.'
 AS
-COPY INTO BRONZE.MATCH_INTERVALS_BRONZE
+COPY INTO BRONZE.INTERVALS
 FROM (
     SELECT
         $1,  -- id
@@ -122,16 +118,16 @@ FROM (
         CURRENT_TIMESTAMP(),
         METADATA$FILENAME,
         METADATA$FILE_ROW_NUMBER,
-        'League Client Daily Logger'
-    FROM @BRONZE.MATCH_INTERVALS_STG
+        'Kaggle simulated daily ingestion'
+    FROM @BRONZE.INTERVALS_STG
 )
 ON_ERROR = 'SKIP_FILE_10%';
 
 
 -------------------------------------------------------------------------------------------
-    -- 5. _MATCH_INTERVALS_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
+    -- 5. _INTERVALS_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW BRONZE._MATCH_INTERVALS_LOAD_ERRORS AS
+CREATE OR REPLACE VIEW BRONZE._INTERVALS_LOAD_ERRORS AS
 SELECT
     FILE_NAME,
     LAST_LOAD_TIME,
@@ -140,7 +136,7 @@ SELECT
     ERROR_COUNT,
     FIRST_ERROR_MESSAGE
 FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
-    TABLE_NAME => 'BRONZE.MATCH_INTERVALS_BRONZE',
+    TABLE_NAME => 'BRONZE.INTERVALS',
     START_TIME => DATEADD(DAY, -30, CURRENT_TIMESTAMP())
 ))
 WHERE ERROR_COUNT > 0;

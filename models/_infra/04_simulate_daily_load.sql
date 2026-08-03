@@ -2,22 +2,22 @@ USE SCHEMA SEED;
 
 
 -------------------------------------------------------------------------------------------
-    -- 1. STAGE_MATCHES_SUMMARY: Extracts one day of matches from seed → stage
+    -- 1. STAGE_MATCHES: Extracts one day of matches from seed → stage
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE SEED.STAGE_MATCHES_SUMMARY(P_GAME_DATE DATE)
+CREATE OR REPLACE PROCEDURE SEED.STAGE_MATCHES(P_GAME_DATE DATE)
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Stages matches_summary rows for a given date into @MATCHES_SUMMARY_STG.'
+COMMENT = 'Stages matches rows for a given date into @MATCHES_STG.'
 AS
 $$
 DECLARE
     v_file_name VARCHAR;
-    v_sql       VARCHAR;
+    v_sql VARCHAR;
     
 BEGIN
     v_file_name := 'matches_' || TO_CHAR(:P_GAME_DATE, 'YYYYMMDD') || '.csv';
     v_sql := '
-        COPY INTO @BRONZE.MATCHES_SUMMARY_STG/' || :v_file_name || '
+        COPY INTO @BRONZE.MATCHES_STG/' || :v_file_name || '
         FROM (
             SELECT 
                 s.MATCH_ID, 
@@ -32,8 +32,8 @@ BEGIN
                 s.AVERAGE_RANK, 
                 s.BLUE_BANS, 
                 s.RED_BANS
-            FROM SEED.SEED_MATCHES_SUMMARY AS s
-            JOIN SEED._SEED_MATCH_DATE_INDEX AS idx 
+            FROM SEED.MATCHES AS s
+            JOIN SEED._MATCH_DATE_INDEX AS idx 
                 ON s.MATCH_ID = idx.MATCH_ID
             WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''
         )
@@ -44,28 +44,28 @@ BEGIN
 
     EXECUTE IMMEDIATE v_sql;
 
-    RETURN 'Staged matches for ' || :P_GAME_DATE || ' → @MATCHES_SUMMARY_STG/' || :v_file_name;
+    RETURN 'Staged matches for ' || :P_GAME_DATE || ' → @MATCHES_STG/' || :v_file_name;
 END;
 $$;
 
 
 -------------------------------------------------------------------------------------------
-    -- 2. STAGE_PLAYERS_SUMMARY: Extracts players for one day's matches from seed → stage
+    -- 2. STAGE_PLAYERS: Extracts players for one day's matches from seed → stage
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE SEED.STAGE_PLAYERS_SUMMARY(P_GAME_DATE DATE)
+CREATE OR REPLACE PROCEDURE SEED.STAGE_PLAYERS(P_GAME_DATE DATE)
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Stages players_summary rows for a given date into @PLAYERS_SUMMARY_STG.'
+COMMENT = 'Stages players rows for a given date into @PLAYERS_STG.'
 AS
 $$
 DECLARE
     v_file_name VARCHAR;
-    v_sql       VARCHAR;
+    v_sql VARCHAR;
     
 BEGIN
     v_file_name := 'players_' || TO_CHAR(:P_GAME_DATE, 'YYYYMMDD') || '.csv';
     v_sql := '
-        COPY INTO @BRONZE.PLAYERS_SUMMARY_STG/' || :v_file_name || '
+        COPY INTO @BRONZE.PLAYERS_STG/' || :v_file_name || '
         FROM (
             SELECT
                 p.ID,
@@ -75,39 +75,39 @@ BEGIN
                 p.CHAMPION,
                 p.ROLE,
                 p.INDIVIDUAL_POSITION
-            FROM SEED.SEED_PLAYERS_SUMMARY p
-            JOIN SEED._SEED_MATCH_DATE_INDEX idx
+            FROM SEED.PLAYERS p
+            JOIN SEED._MATCH_DATE_INDEX idx
                 ON p.MATCH_ID = idx.MATCH_ID
             WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''
         )
         FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
-        HEADER    = TRUE
+        HEADER = TRUE
         OVERWRITE = TRUE
-        SINGLE    = TRUE';
+        SINGLE = TRUE';
         
     EXECUTE IMMEDIATE v_sql;
     
-    RETURN 'Staged players for ' || :P_GAME_DATE || ' → @PLAYERS_SUMMARY_STG/' || :v_file_name;
+    RETURN 'Staged players for ' || :P_GAME_DATE || ' → @PLAYERS_STG/' || :v_file_name;
 END;
 $$;
 
 -------------------------------------------------------------------------------------------
-    -- 3. STAGE_MATCH_INTERVALS: Extracts intervals for one day's matches from seed → stage
+    -- 3. STAGE_INTERVALS: Extracts intervals for one day's matches from seed → stage
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE SEED.STAGE_MATCH_INTERVALS(P_GAME_DATE DATE)
+CREATE OR REPLACE PROCEDURE SEED.STAGE_INTERVALS(P_GAME_DATE DATE)
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Stages match_intervals rows for a given date into @MATCH_INTERVALS_STG.'
+COMMENT = 'Stages intervals rows for a given date into @INTERVALS_STG.'
 AS
 $$
 DECLARE
     v_file_name VARCHAR;
-    v_sql       VARCHAR;
+    v_sql VARCHAR;
     
 BEGIN
     v_file_name := 'intervals_' || TO_CHAR(:P_GAME_DATE, 'YYYYMMDD') || '.csv';
     v_sql := '
-        COPY INTO @BRONZE.MATCH_INTERVALS_STG/' || :v_file_name || '
+        COPY INTO @BRONZE.INTERVALS_STG/' || :v_file_name || '
         FROM (
             SELECT
                 i.ID,
@@ -146,30 +146,30 @@ BEGIN
                 i.GOLD_DIFF,
                 i.XP_DIFF,
                 i.TEAM_GOLD_DIFF
-            FROM SEED.SEED_MATCH_INTERVALS i
-            JOIN SEED._SEED_MATCH_DATE_INDEX idx
+            FROM SEED.INTERVALS i
+            JOIN SEED._MATCH_DATE_INDEX idx
                 ON i.MATCH_ID = idx.MATCH_ID
             WHERE idx.GAME_DATE_DAY = ''' || :P_GAME_DATE || '''
         )
         FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
-        HEADER    = TRUE
+        HEADER = TRUE
         OVERWRITE = TRUE
-        SINGLE    = TRUE';
+        SINGLE = TRUE';
         
     EXECUTE IMMEDIATE v_sql;
     
-    RETURN 'Staged intervals for ' || :P_GAME_DATE || ' → @MATCH_INTERVALS_STG/' || :v_file_name;
+    RETURN 'Staged intervals for ' || :P_GAME_DATE || ' → @INTERVALS_STG/' || :v_file_name;
 END;
 $$;
 
 
 -------------------------------------------------------------------------------------------
-    -- 4. INITIALIZE_SEED_LOAD_STATE: Sets initial date boundaries on first run
+    -- 4. INITIALIZE_LOAD_STATE: Sets initial date boundaries on first run
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE SEED.INITIALIZE_SEED_LOAD_STATE()
+CREATE OR REPLACE PROCEDURE SEED.INITIALIZE_LOAD_STATE()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Initializes SEED_LOAD_STATE with max/min dates from _SEED_MATCH_DATE_INDEX. No-op if already initialized.'
+COMMENT = 'Initializes LOAD_STATE with max/min dates from _MATCH_DATE_INDEX. No-op if already initialized.'
 AS
 $$
 DECLARE
@@ -178,19 +178,19 @@ DECLARE
 BEGIN
     SELECT CURRENT_LOAD_DATE 
     INTO :v_current 
-    FROM SEED.SEED_LOAD_STATE 
+    FROM SEED.LOAD_STATE 
     LIMIT 1;
 
     IF (:v_current IS NOT NULL) THEN
         RETURN 'Already initialized. Current date: ' || :v_current;
     END IF;
 
-    UPDATE SEED.SEED_LOAD_STATE
-       SET CURRENT_LOAD_DATE = (SELECT MAX(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX),
-           MIN_DATE          = (SELECT MIN(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX),
-           MAX_DATE          = (SELECT MAX(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX);
+    UPDATE SEED.LOAD_STATE
+       SET CURRENT_LOAD_DATE = (SELECT MAX(GAME_DATE_DAY) FROM SEED._MATCH_DATE_INDEX),
+           MIN_DATE = (SELECT MIN(GAME_DATE_DAY) FROM SEED._MATCH_DATE_INDEX),
+           MAX_DATE = (SELECT MAX(GAME_DATE_DAY) FROM SEED._MATCH_DATE_INDEX);
 
-    RETURN 'Initialized. Starting from ' || (SELECT MAX(GAME_DATE_DAY) FROM SEED._SEED_MATCH_DATE_INDEX);
+    RETURN 'Initialized. Starting from ' || (SELECT MAX(GAME_DATE_DAY) FROM SEED._MATCH_DATE_INDEX);
 END;
 $$;
 
@@ -201,29 +201,29 @@ $$;
 CREATE OR REPLACE PROCEDURE SEED.ADVANCE_LOAD_STATE(P_CURRENT_DATE DATE)
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Advances SEED_LOAD_STATE to the next available date below P_CURRENT_DATE (skips gaps).'
+COMMENT = 'Advances LOAD_STATE to the next available date below P_CURRENT_DATE (skips gaps).'
 AS
 $$
 DECLARE
     v_next_date DATE;
-    v_min_date  DATE;
+    v_min_date DATE;
     
 BEGIN
     SELECT MIN_DATE 
     INTO :v_min_date 
-    FROM SEED.SEED_LOAD_STATE 
+    FROM SEED.LOAD_STATE 
     LIMIT 1;
 
     SELECT MAX(GAME_DATE_DAY) 
     INTO :v_next_date
-    FROM SEED._SEED_MATCH_DATE_INDEX
+    FROM SEED._MATCH_DATE_INDEX
     WHERE GAME_DATE_DAY < :P_CURRENT_DATE;
 
     IF (:v_next_date IS NULL) THEN
         v_next_date := DATEADD(DAY, -1, :v_min_date);
     END IF;
 
-    UPDATE SEED.SEED_LOAD_STATE
+    UPDATE SEED.LOAD_STATE
        SET CURRENT_LOAD_DATE = :v_next_date,
            LAST_LOADED_AT = CURRENT_TIMESTAMP();
 
@@ -233,9 +233,9 @@ $$;
 
 
 -------------------------------------------------------------------------------------------
-    -- 6. READ_SEED_LOAD_STATE: Returns current load date, or NULL if exhausted
+    -- 6. READ_LOAD_STATE: Returns current load date, or NULL if exhausted
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE SEED.READ_SEED_LOAD_STATE()
+CREATE OR REPLACE PROCEDURE SEED.READ_LOAD_STATE()
 RETURNS DATE
 LANGUAGE SQL
 COMMENT = 'Returns CURRENT_LOAD_DATE if data remains, NULL if all dates have been ingested.'
@@ -243,12 +243,12 @@ AS
 $$
 DECLARE
     v_load_date DATE;
-    v_min_date  DATE;
+    v_min_date DATE;
     
 BEGIN
     SELECT CURRENT_LOAD_DATE, MIN_DATE
     INTO :v_load_date, :v_min_date
-    FROM SEED.SEED_LOAD_STATE
+    FROM SEED.LOAD_STATE
     LIMIT 1;
 
     IF (:v_load_date IS NULL OR :v_load_date < :v_min_date) THEN
@@ -275,20 +275,20 @@ DECLARE
     v_advance_result VARCHAR;
 
 BEGIN
-    CALL SEED.INITIALIZE_SEED_LOAD_STATE();
+    CALL SEED.INITIALIZE_LOAD_STATE();
 
-    CALL SEED.READ_SEED_LOAD_STATE() INTO :v_load_date;
+    CALL SEED.READ_LOAD_STATE() INTO :v_load_date;
     IF (:v_load_date IS NULL) THEN
         RETURN 'No more data to load. All dates have been ingested.';
     END IF;
 
-    CALL SEED.STAGE_MATCHES_SUMMARY(:v_load_date);
-    CALL SEED.STAGE_PLAYERS_SUMMARY(:v_load_date);
-    CALL SEED.STAGE_MATCH_INTERVALS(:v_load_date);
+    CALL SEED.STAGE_MATCHES(:v_load_date);
+    CALL SEED.STAGE_PLAYERS(:v_load_date);
+    CALL SEED.STAGE_INTERVALS(:v_load_date);
 
-    ALTER PIPE BRONZE.MATCHES_SUMMARY_PP REFRESH;
-    ALTER PIPE BRONZE.PLAYERS_SUMMARY_PP REFRESH;
-    ALTER PIPE BRONZE.MATCH_INTERVALS_PP REFRESH;
+    ALTER PIPE BRONZE.MATCHES_PP REFRESH;
+    ALTER PIPE BRONZE.PLAYERS_PP REFRESH;
+    ALTER PIPE BRONZE.INTERVALS_PP REFRESH;
 
     CALL SEED.ADVANCE_LOAD_STATE(:v_load_date) INTO :v_advance_result;
 

@@ -2,7 +2,7 @@ USE SCHEMA SEED;
 
 -------------------------------------------------------------------------------------------
 -- VALIDATE_SEED_UPLOAD: Checks that each required file exists exactly once in
--- SEED_UPLOAD_STG before proceeding with COPY INTO. Raises an exception if any prefix has
+-- SEED.UPLOAD_STG before proceeding with COPY INTO. Raises an exception if any prefix has
 -- zero matches (missing) or more than one match. Zero-byte files are excluded as well.
 --
 -- Expected file prefixes:
@@ -11,11 +11,11 @@ USE SCHEMA SEED;
 CREATE OR REPLACE PROCEDURE SEED.VALIDATE_SEED_UPLOAD()
 RETURNS VARCHAR
 LANGUAGE SQL
-COMMENT = 'Guards seed ingestion by verifying all required CSV files exist exactly once in @SEED.SEED_UPLOAD_STG.'
+COMMENT = 'Guards seed ingestion by verifying all required CSV files exist exactly once in @SEED.UPLOAD_STG.'
 AS
 $$
 DECLARE
-    v_missing   ARRAY DEFAULT ARRAY_CONSTRUCT();
+    v_missing ARRAY DEFAULT ARRAY_CONSTRUCT();
     v_ambiguous ARRAY DEFAULT ARRAY_CONSTRUCT();
 
 BEGIN
@@ -33,7 +33,7 @@ BEGIN
             P.PREFIX,
             COUNT(D.RELATIVE_PATH) AS FILE_COUNT
         FROM EXPECTED_PREFIXES AS P
-        LEFT JOIN DIRECTORY(@SEED.SEED_UPLOAD_STG) AS D
+        LEFT JOIN DIRECTORY(@SEED.UPLOAD_STG) AS D
             ON D.RELATIVE_PATH ILIKE P.PREFIX || '%'
             AND D.SIZE > 0
         GROUP BY P.PREFIX
@@ -53,6 +53,6 @@ BEGIN
         EXECUTE IMMEDIATE 'SELECT * FROM ' || :v_msg;
     END IF;
 
-    RETURN 'All required files present exactly once in @SEED.SEED_UPLOAD_STG.';
+    RETURN 'All required files present exactly once in @SEED.UPLOAD_STG.';
 END;
 $$;
