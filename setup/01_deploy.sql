@@ -1,13 +1,7 @@
 -------------------------------------------------------------------------------------------
 -- 00. SETUP DATABASE AND DEPLOY SESSION CONTEXT
---
--- WARNING: DESTRUCTIVE. CREATE OR REPLACE DATABASE below drops LEAGUE_RECORDS and everything
--- in it -- all seeded data, all simulated ingestion progress (SEED.SEED_LOAD_STATE), all Gold
--- history -- before rebuilding from scratch. Re-running this file is a full teardown/rebuild,
--- not an incremental update. Re-seed and re-run run_daily_ingestion.sql afterward if you want
--- data back.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE DATABASE LEAGUE_RECORDS
+CREATE DATABASE IF NOT EXISTS LEAGUE_RECORDS
     COMMENT = '2.11 million time-series snapshots extracted from 39,954 high-elo, Summoner's Rift LoL matches.';
 
 USE WAREHOUSE COMPUTE_WH;
@@ -23,23 +17,22 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 -------------------------------------------------------------------------------------------
 -- 02. BRONZE: RAW INGESTION
 -------------------------------------------------------------------------------------------
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/00_file_format.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/01_matches_summary_bronze.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/02_players_summary_bronze.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/03_match_intervals_bronze.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/04_items_ref_bronze.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/05_champions_ref_bronze.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/00_league_csv_fmt.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/01_matches.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/02_players.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/03_items_ref.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/04_champions_ref.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/05_intervals.sql';
 
 -------------------------------------------------------------------------------------------
 -- 03. SILVER: CLEANED & ENRICHED
 -------------------------------------------------------------------------------------------
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/01_matches_summary_silver.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/02_players_summary_silver.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/03_references_silver.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/04_split_match_intervals_stream_cleaning.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/05a_team_interval_silver.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/05b_player_interval_silver.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/06_bronze_to_silver_intervals_task.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/00_functions.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/01_matches.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/02_players.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/03_items_ref.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/04_champions_ref.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/silver/05_intervals.sql';
 
 -------------------------------------------------------------------------------------------
 -- 04. GOLD: ANALYTICAL (dynamic tables; self-refresh via TARGET_LAG, no task activation)
