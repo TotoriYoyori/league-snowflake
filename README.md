@@ -115,12 +115,12 @@ Each one maps to a table you can query directly:
 
 | Question                                                      | Answered by |
 |---------------------------------------------------------------|-------------|
-| Does an early gold lead actually win games?                   | `MATCH_TEAM_STATS_SUMMARY` |
-| Which objectives (dragons, barons, grubs) swing a match most? | `MATCH_TEAM_STATS_SUMMARY` |
+| Does an early gold lead actually win games?                   | `MATCHEND_PIVOT_TEAMSTATS` |
+| Which objectives (dragons, barons, grubs) swing a match most? | `MATCHEND_PIVOT_TEAMSTATS` |
 | How does a champion grow over the course of a game?           | `CHAMPION_INTERVALS` |
-| What do different match-end player lineups looks like?        | `PLAYER_STATS_SUMMARY` |
-| Which champions and lanes dominate the meta?                  | `CHAMPION_OVERVIEW` |
-| What should I build on champion *X*?                          | `ITEM_STATS_AND_RECOMMENDATIONS` |
+| What do different match-end player lineups looks like?        | `MATCHEND_PLAYER_STATS` |
+| Which champions and lanes dominate the meta?                  | `CHAMPION_OVERVIEWS` |
+| What should I build on champion *X*?                          | `ITEM_RECOMMENDATIONS` |
 
 
 ----

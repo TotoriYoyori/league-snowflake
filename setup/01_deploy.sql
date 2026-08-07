@@ -23,6 +23,7 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/03_items_ref.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/04_champions_ref.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/05_intervals.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/bronze/06_unlogged_matches.sql';
 
 -------------------------------------------------------------------------------------------
 -- 03. SILVER: CLEANED & ENRICHED
@@ -37,18 +38,19 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 -------------------------------------------------------------------------------------------
 -- 04. GOLD: ANALYTICAL (dynamic tables; self-refresh via TARGET_LAG, no task activation)
 -------------------------------------------------------------------------------------------
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/01_player_stats_summary.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/01_matchend_player_stats.sql';
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/02_champion_intervals.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/03_champion_overview.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/04_match_team_stats_summary.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/05_item_stats_and_recommendations.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/06_diff_interval_state.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/03_champion_overviews.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/04_matchend_pivot_teamstats.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/05_item_recommendations.sql';
+EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/models/gold/06_diff_intervals.sql';
 
 -------------------------------------------------------------------------------------------
 -- 05. PATCHES: AD-HOC TO THE PIPELINE DURING DEVELOPMENTS
+--     NOTE: 20260627_view_flag_missing_records.sql is intentionally not run here — it has
+--     been promoted to models/bronze/06_unlogged_matches.sql (see BRONZE section above).
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260625_add_orphan_item_id_under_ref.sql';
-EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260627_view_flag_missing_records.sql';
 
 -------------------------------------------------------------------------------------------
 -- 06. PROCEDURES

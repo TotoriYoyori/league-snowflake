@@ -1,13 +1,17 @@
-USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
--- PROBLEM: There are 73 missing matches between GOLD.PLAYER_STATS_SUMMARY and 
--- SILVER.PLAYER_SUMMARY_SILVER despite sharing the same (MATCH_ID, PARTICIPANT_POS_ID)
--- grain. Same holds for GOLD.MATCH_TEAM_STATS_SUMMARY and SILVER.MATCH_SUMMARY_SILVER
+-- PROMOTED: This patch has been promoted to a proper deployed model at
+-- models/bronze/06_unlogged_matches.sql.
+-------------------------------------------------------------------------------------------
+-- USE SCHEMA BRONZE;
+-------------------------------------------------------------------------------------------
+-- PROBLEM: There are 73 missing matches between GOLD.MATCHEND_PLAYER_STATS and
+-- SILVER.PLAYERS despite sharing the same (MATCH_ID, PARTICIPANT_POS_ID)
+-- grain. Same holds for GOLD.MATCHEND_PIVOT_TEAMSTATS and SILVER.MATCHES
 -- at the (MATCH_ID) grain.
 
--- HYPOTHESIS: Some matches are summarized but does not have logged interval data. 
--- (e.g. match A has summary but no logged intervals in MATCH_INTERVALS_). This causes the joinings
--- that occur in gold to drop data. 
+-- HYPOTHESIS: Some matches are summarized but does not have logged interval data.
+-- (e.g. match A has summary but no logged intervals in BRONZE.INTERVALS). This causes the joinings
+-- that occur in gold to drop data.
 -------------------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------------------
@@ -16,22 +20,22 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
 -- WITH SILVER_PLAYER AS (
 --     SELECT COUNT(DISTINCT MATCH_ID, PARTICIPANT_POS_ID) AS ROW_COUNTS
---     FROM SILVER.PLAYERS_SUMMARY_SILVER
+--     FROM SILVER.PLAYERS
 -- ),
 
 -- GOLD_PLAYER AS (
 --     SELECT COUNT(DISTINCT MATCH_ID, PARTICIPANT_POS_ID) AS ROW_COUNTS
---     FROM GOLD.PLAYER_STATS_SUMMARY
+--     FROM GOLD.MATCHEND_PLAYER_STATS
 -- ),
 
 -- SILVER_MATCH AS (
 --     SELECT COUNT(DISTINCT MATCH_ID) AS ROW_COUNTS
---     FROM SILVER.MATCHES_SUMMARY_SILVER
+--     FROM SILVER.MATCHES
 -- ),
 
 -- GOLD_MATCH AS (
 --     SELECT COUNT(DISTINCT MATCH_ID) AS ROW_COUNTS
---     FROM GOLD.MATCH_TEAM_STATS_SUMMARY
+--     FROM GOLD.MATCHEND_PIVOT_TEAMSTATS
 -- )
 
 -- SELECT
@@ -63,8 +67,8 @@ USE SCHEMA BRONZE;
 -------------------------------------------------------------------------------------------
 -- WITH MISSING_RECORDS_IN_SILVER AS (
 --     SELECT COUNT(DISTINCT SL.MATCH_ID) AS UNLOGGED_INTERVAL_MATCHES
---     FROM SILVER.PLAYERS_SUMMARY_SILVER AS SL
---     LEFT JOIN SILVER.PLAYER_INTERVAL_SILVER AS SR
+--     FROM SILVER.PLAYERS AS SL
+--     LEFT JOIN SILVER.INTERVALS AS SR
 --         ON SL.MATCH_ID = SR.MATCH_ID
 --         AND SL.PARTICIPANT_POS_ID = SR.PARTICIPANT_POS_ID
 --     WHERE SR.CS IS NULL
@@ -72,16 +76,16 @@ USE SCHEMA BRONZE;
 
 -- MISSING_RECORDS_AT_BRONZE AS (
 --     SELECT COUNT(DISTINCT BL.MATCH_ID) AS UNLOGGED_INTERVAL_MATCHES
---     FROM BRONZE.PLAYERS_SUMMARY_BRONZE AS BL
---     LEFT JOIN BRONZE.MATCH_INTERVALS_BRONZE AS BR
+--     FROM BRONZE.MATCHES AS BL
+--     LEFT JOIN BRONZE.INTERVALS AS BR
 --         ON BL.MATCH_ID = BR.MATCH_ID
---     WHERE BR.CS IS NULL
+--     WHERE BR.MATCH_ID IS NULL
 -- )
 
--- SELECT 
+-- SELECT
 --     SV.UNLOGGED_INTERVAL_MATCHES AS UNLOGGED_IN_SILVER,
 --     BR.UNLOGGED_INTERVAL_MATCHES AS UNLOGGED_IN_BRONZE,
---     (SV.UNLOGGED_INTERVAL_MATCHES = BR.UNLOGGED_INTERVAL_MATCHES) 
+--     (SV.UNLOGGED_INTERVAL_MATCHES = BR.UNLOGGED_INTERVAL_MATCHES)
 --         AS CONFIRMED_SRC_MISSING_DATA
 -- FROM MISSING_RECORDS_IN_SILVER AS SV, MISSING_RECORDS_AT_BRONZE AS BR
 -- ;
@@ -90,19 +94,19 @@ USE SCHEMA BRONZE;
 -- 03. SOLUTION: View on bronze to keep an audit trail of missing matches by load date,
 -- for future reference as we ingest more matches
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE VIEW BRONZE._UNLOGGED_MATCHES AS 
-SELECT DISTINCT 
-    BL.MATCH_ID AS UNLOGGED_INTERVAL_MATCH_ID, 
-    BL.FILE_NAME AS UNLOGGED_INTERVAL_FILE_NAME, 
-    BL.LDTS AS UNLOGGED_AT_LOAD_DATE, 
-    BL.RSRC AS UNLOGGED_FROM_SOURCE
-FROM BRONZE.PLAYERS_SUMMARY_BRONZE AS BL
-LEFT JOIN BRONZE.MATCH_INTERVALS_BRONZE AS BR
-    ON BR.MATCH_ID = BL.MATCH_ID
-WHERE BR.CS IS NULL
-;
+-- CREATE OR REPLACE VIEW BRONZE._UNLOGGED_MATCHES AS
+-- SELECT
+--     BL.MATCH_ID AS UNLOGGED_INTERVAL_MATCH_ID,
+--     BL.FILE_NAME AS UNLOGGED_INTERVAL_FILE_NAME,
+--     BL.LDTS AS UNLOGGED_AT_LOAD_DATE,
+--     BL.RSRC AS UNLOGGED_FROM_SOURCE
+-- FROM BRONZE.MATCHES AS BL
+-- LEFT JOIN BRONZE.INTERVALS AS BR
+--     ON BR.MATCH_ID = BL.MATCH_ID
+-- WHERE BR.MATCH_ID IS NULL
+-- ;
 
 -------------------------------------------------------------------------------------------
--- 04. VERIFY: Uncomment to verify 
+-- 04. VERIFY: Uncomment to verify
 -------------------------------------------------------------------------------------------
 -- SELECT * FROM BRONZE._UNLOGGED_MATCHES LIMIT 10;

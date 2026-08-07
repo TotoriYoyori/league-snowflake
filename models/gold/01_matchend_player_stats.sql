@@ -4,7 +4,7 @@ USE SCHEMA GOLD;
     --     a. "End of match" stats (KILLS/DEATHS/ASSISTS/CS/TOTAL_GOLD/ITEM_BUILD/LEVEL) reflect
     --     the LAST LOGGED INTERVAL, not the literal game-end state. Source data is sampled
     --     every 5 minutes, so up to ~4-5 minutes of unrecorded state (item purchases, kills,
-    --     gold gain) may be missing between last logged interval and actual end time. 
+    --     gold gain) may be missing between last logged interval and actual end time.
     --     b. UNLOGGED_DURATION is added as a column to inform end users how stale each record can be,
     --
     -- FUTURE IMPROVEMENTS:
@@ -12,8 +12,8 @@ USE SCHEMA GOLD;
     --     (separate from the timeline/interval endpoint), prefer that for final build and
     --     final KDA/gold specifically, and keep interval data only for time-series analysis.
 -------------------------------------------------------------------------------------------
-CREATE OR REPLACE DYNAMIC TABLE GOLD.PLAYER_STATS_SUMMARY
-TARGET_LAG = '1 day'         
+CREATE OR REPLACE DYNAMIC TABLE GOLD.MATCHEND_PLAYER_STATS
+TARGET_LAG = '1 day'
 WAREHOUSE = COMPUTE_WH
 REFRESH_MODE = FULL
 COMMENT = 'One end game player stat per (MATCH_ID, PARTICIPANT_POS_ID).'
@@ -24,21 +24,18 @@ AS
 -------------------------------------------------------------------------------------------
 WITH FINAL_SNAPSHOT AS (
     SELECT *
-    FROM SILVER.PLAYER_INTERVAL_SILVER
+    FROM SILVER.INTERVALS
     QUALIFY ROW_NUMBER() OVER (
-        PARTITION BY MATCH_ID, PARTICIPANT_POS_ID 
+        PARTITION BY MATCH_ID, PARTICIPANT_POS_ID
         ORDER BY MINUTE DESC
     ) = 1
 ),
 
 MATCH_STATS_AT_END AS (
     SELECT
-        -- Composite key
         MATCH_ID,
         PARTICIPANT_POS_ID,
-        -- Context
         MINUTE,
-        -- Stats
         LEVEL,
         KILLS,
         DEATHS,
@@ -64,7 +61,7 @@ FLATTENED_ITEM_IDS AS (
     SELECT
         IA.MATCH_ID,
         IA.PARTICIPANT_POS_ID,
-        ITEM.VALUE::VARCHAR AS ITEM_ID
+        ITEM.VALUE::INT AS ITEM_ID
     FROM ITEM_ID_ARRAY AS IA
     CROSS JOIN LATERAL FLATTEN(INPUT => IA.ITEM_IDS) AS ITEM
 ),
@@ -77,7 +74,7 @@ NAMED_ITEM_BUILD AS (
             ARRAY_COMPACT(ARRAY_AGG(IR.ITEM_NAME))
         ) AS ITEM_BUILD
     FROM FLATTENED_ITEM_IDS AS FI
-    LEFT JOIN SILVER.ITEMS_REF_SILVER AS IR
+    LEFT JOIN SILVER.ITEMS_REF AS IR
         ON IR.ITEM_ID = FI.ITEM_ID
     GROUP BY FI.MATCH_ID, FI.PARTICIPANT_POS_ID
 ),
@@ -85,7 +82,7 @@ NAMED_ITEM_BUILD AS (
     -- 03. WITH_PLAYER_SUMMARY
     --     Join interval snapshot with matches summary, player summary, and the
     --     resolved item-name build array.
-    --     (e.g. derive Win/Lose, Champion, Lane)
+    --     (e.g. derive Win/Lose, Champion Name, Champion Role)
 -------------------------------------------------------------------------------------------
 WITH_PLAYER_SUMMARY AS (
     SELECT
@@ -97,8 +94,8 @@ WITH_PLAYER_SUMMARY AS (
         -- Filter
         PS.TEAM,
         (PS.TEAM = MAT.WINNING_TEAM) AS WIN,
-        PS.CHAMPION,
-        PS.LANE,
+        PS.CHAMPION_NAME,
+        PS.CHAMPION_ROLE,
         -- Stats
         SE.LEVEL,
         SE.KILLS,
@@ -111,43 +108,59 @@ WITH_PLAYER_SUMMARY AS (
         -- Unlogged duration for record quality check
         GREATEST(MAT.GAME_DURATION - SE.MINUTE * 60, 0) AS UNLOGGED_DURATION
     FROM MATCH_STATS_AT_END AS SE
-    JOIN SILVER.MATCHES_SUMMARY_SILVER AS MAT
+    JOIN SILVER.MATCHES AS MAT
         ON MAT.MATCH_ID = SE.MATCH_ID
-    JOIN SILVER.PLAYERS_SUMMARY_SILVER AS PS
+    JOIN SILVER.PLAYERS AS PS
         ON PS.MATCH_ID = SE.MATCH_ID
         AND PS.PARTICIPANT_POS_ID = SE.PARTICIPANT_POS_ID
     LEFT JOIN NAMED_ITEM_BUILD AS NB
         ON NB.MATCH_ID = SE.MATCH_ID
         AND NB.PARTICIPANT_POS_ID = SE.PARTICIPANT_POS_ID
 )
--------------------------------------------------------------------------------------------
-    -- Select all above for complete query (Verify and test results here as well)
--------------------------------------------------------------------------------------------
+
 SELECT * FROM WITH_PLAYER_SUMMARY;
 -------------------------------------------------------------------------------------------
     -- Column-specific comments
 -------------------------------------------------------------------------------------------
-COMMENT ON COLUMN GOLD.PLAYER_STATS_SUMMARY.UNLOGGED_DURATION IS
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.PARTICIPANT_POS_ID IS
+'The index position of the player at queue time. 1-5 for BLUE side, 6-10 for RED side.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.GAME_DURATION IS
+'Match duration in seconds.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.TEAM IS
+'BLUE or RED.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.WIN IS
+'Whether this player''s team won the match.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.CHAMPION_NAME IS
+'Champion played.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.CHAMPION_ROLE IS
+'Resolved role played, based on in-game signals.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.LEVEL IS
+'End-of-match champion level.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.KILLS IS
+'End-of-match kills.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.DEATHS IS
+'End-of-match deaths.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.ASSISTS IS
+'End-of-match assists.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.CS IS
+'End-of-match combined lane + jungle creep score.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.TOTAL_GOLD IS
+'End-of-match cumulative gold earned.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.ITEM_BUILD IS
+'End-of-match sorted item names.'
+;
+COMMENT ON COLUMN GOLD.MATCHEND_PLAYER_STATS.UNLOGGED_DURATION IS
 'Seconds between this player''s last logged 5-minute interval and actual match end (GAME_DURATION). Inform how stale each record can be.'
 ;
--------------------------------------------------------------------------------------------
--- Diagnostic only. Use to investigate the logging-gap
--- limitation described in the header notes for a specific match/player if needed.
--- DIAGNOSTIC_LAST_INTERVAL_GAP AS (
---     SELECT
---         SE.MATCH_ID,
---         SE.PARTICIPANT_POS_ID,
---         SE.MINUTE AS LAST_LOGGED_MINUTE,
---         MAT.GAME_DURATION,
---         ROUND(MAT.GAME_DURATION / 60.0, 1) AS GAME_DURATION_MINUTES,
---         ROUND(MAT.GAME_DURATION / 60.0, 1) - SE.MINUTE AS UNLOGGED_GAP_MINUTES
---     FROM MATCH_STATS_AT_END AS SE
---     JOIN SILVER.MATCHES_SUMMARY_SILVER AS MAT
---         ON MAT.MATCH_ID = SE.MATCH_ID
--- )
-
--- SELECT *
--- FROM DIAGNOSTIC_LAST_INTERVAL_GAP
--- ;
--------------------------------------------------------------------------------------------
-SELECT * FROM GOLD.PLAYER_STATS_SUMMARY;
