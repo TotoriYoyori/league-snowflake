@@ -1,6 +1,4 @@
 USE SCHEMA BRONZE;
-
-
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Raw match interval data with load metadata
 -------------------------------------------------------------------------------------------
@@ -56,16 +54,12 @@ CREATE TABLE IF NOT EXISTS BRONZE.INTERVALS (
     CONSTRAINT BRONZE_INTERVALS_PKEY PRIMARY KEY (ID)
 )
 COMMENT = '[BRONZE] Raw match interval snapshots. Loaded via INTERVALS_PP from @INTERVALS_STG.';
-
-
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
 CREATE STREAM IF NOT EXISTS BRONZE.INTERVALS_STM
     ON TABLE BRONZE.INTERVALS
     COMMENT = 'INTERVALS delta --> BRONZE_TO_SILVER_INTERVALS_TASK';
-
-
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for interval snapshot CSVs
 -------------------------------------------------------------------------------------------
@@ -73,8 +67,6 @@ CREATE STAGE IF NOT EXISTS BRONZE.INTERVALS_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for per-minute interval snapshot CSVs. Expected file: intervals_YYYYMMDD.csv';
-
-
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
@@ -127,8 +119,6 @@ FROM (
     FROM @BRONZE.INTERVALS_STG
 )
 ON_ERROR = 'SKIP_FILE_10%';
-
-
 -------------------------------------------------------------------------------------------
     -- 5. _INTERVALS_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
 -------------------------------------------------------------------------------------------

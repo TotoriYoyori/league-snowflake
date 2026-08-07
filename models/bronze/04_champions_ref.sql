@@ -1,6 +1,4 @@
 USE SCHEMA BRONZE;
-
-
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Champions reference lookup
 -------------------------------------------------------------------------------------------
@@ -17,16 +15,12 @@ CREATE TABLE IF NOT EXISTS BRONZE.CHAMPIONS_REF (
     CONSTRAINT BRONZE_CHAMPIONS_REF_PKEY PRIMARY KEY (CHAMPION_ID)
 )
 COMMENT = '[BRONZE] Champion reference lookup. Loaded via CHAMPIONS_REF_PP from @CHAMPIONS_REF_STG.';
-
-
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
 CREATE STREAM IF NOT EXISTS BRONZE.CHAMPIONS_REF_STM
     ON TABLE BRONZE.CHAMPIONS_REF
-    COMMENT = 'CHAMPIONS_REF delta --> BRONZE_TO_SILVER_CHAMPIONS_TASK --> SILVER.CHAMPIONS_REF';
-
-
+    COMMENT = 'CHAMPIONS_REF delta --> BRONZE_TO_SILVER_CHAMPIONS_REF_TASK --> SILVER.CHAMPIONS_REF';
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for champions reference CSV
 -------------------------------------------------------------------------------------------
@@ -34,7 +28,6 @@ CREATE STAGE IF NOT EXISTS BRONZE.CHAMPIONS_REF_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for champion reference CSV. Expected file: champions_ref.csv';
-
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
@@ -53,8 +46,6 @@ FROM (
     FROM @BRONZE.CHAMPIONS_REF_STG
 )
 ON_ERROR = 'SKIP_FILE_10%';
-
-
 -------------------------------------------------------------------------------------------
     -- 5. _CHAMPIONS_REF_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
 -------------------------------------------------------------------------------------------

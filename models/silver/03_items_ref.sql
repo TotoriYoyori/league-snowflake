@@ -1,5 +1,4 @@
 USE SCHEMA SILVER;
-
 -------------------------------------------------------------------------------------------
     -- 1. CLEANING VIEW
 -------------------------------------------------------------------------------------------
@@ -10,7 +9,6 @@ SELECT
     INITCAP(ITEM_CATEGORY) AS ITEM_CATEGORY
 FROM BRONZE.ITEMS_REF_STM
 ;
-
 -------------------------------------------------------------------------------------------
     -- 2. SILVER TABLE: One row per item. PK on ITEM_ID.
 -------------------------------------------------------------------------------------------
@@ -22,7 +20,6 @@ CREATE TABLE IF NOT EXISTS SILVER.ITEMS_REF (
     CONSTRAINT SILVER_ITEMS_REF_PKEY PRIMARY KEY (ITEM_ID)
 )
 COMMENT = '[SILVER] Cleaned item reference.';
-
 -------------------------------------------------------------------------------------------
     -- 3. TASK: Merge new/changed rows from cleaning view into ITEMS_REF
 -------------------------------------------------------------------------------------------

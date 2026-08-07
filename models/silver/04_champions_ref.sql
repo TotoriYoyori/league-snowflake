@@ -1,5 +1,4 @@
 USE SCHEMA SILVER;
-
 -------------------------------------------------------------------------------------------
     -- 1. CLEANING VIEW
 -------------------------------------------------------------------------------------------
@@ -9,7 +8,6 @@ SELECT
     UPPER(CHAMPION_NAME) AS CHAMPION_NAME
 FROM BRONZE.CHAMPIONS_REF_STM
 ;
-
 -------------------------------------------------------------------------------------------
     -- 2. SILVER TABLE: One row per champion. PK on CHAMPION_ID.
 -------------------------------------------------------------------------------------------
@@ -20,7 +18,6 @@ CREATE TABLE IF NOT EXISTS SILVER.CHAMPIONS_REF (
     CONSTRAINT SILVER_CHAMPIONS_REF_PKEY PRIMARY KEY (CHAMPION_ID)
 )
 COMMENT = '[SILVER] Cleaned champion reference, uppercased for consistency.';
-
 -------------------------------------------------------------------------------------------
     -- 3. TASK: Merge new/changed rows from cleaning view into CHAMPIONS_REF
 -------------------------------------------------------------------------------------------

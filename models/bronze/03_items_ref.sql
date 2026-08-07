@@ -1,6 +1,4 @@
 USE SCHEMA BRONZE;
-
-
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Items reference lookup
 -------------------------------------------------------------------------------------------
@@ -18,16 +16,12 @@ CREATE TABLE IF NOT EXISTS BRONZE.ITEMS_REF (
     CONSTRAINT BRONZE_ITEMS_REF_PKEY PRIMARY KEY (ITEM_ID)
 )
 COMMENT = '[BRONZE] Item reference lookup. Loaded via ITEMS_REF_PP from @ITEMS_REF_STG.';
-
-
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
 CREATE STREAM IF NOT EXISTS BRONZE.ITEMS_REF_STM
     ON TABLE BRONZE.ITEMS_REF
-    COMMENT = 'ITEMS_REF delta --> BRONZE_TO_SILVER_ITEMS_TASK --> SILVER.ITEMS_REF';
-
-
+    COMMENT = 'ITEMS_REF delta --> BRONZE_TO_SILVER_ITEMS_REF_TASK --> SILVER.ITEMS_REF';
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for items reference CSV
 -------------------------------------------------------------------------------------------
@@ -35,7 +29,6 @@ CREATE STAGE IF NOT EXISTS BRONZE.ITEMS_REF_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for item reference CSV. Expected file: items_ref.csv';
-
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
@@ -55,8 +48,6 @@ FROM (
     FROM @BRONZE.ITEMS_REF_STG
 )
 ON_ERROR = 'SKIP_FILE_10%';
-
-
 -------------------------------------------------------------------------------------------
     -- 5. _ITEMS_REF_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
 -------------------------------------------------------------------------------------------

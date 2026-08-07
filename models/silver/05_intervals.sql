@@ -1,13 +1,11 @@
 USE SCHEMA SILVER;
-
-
 -------------------------------------------------------------------------------------------
     -- 1. CLEANING VIEW
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE VIEW SILVER.INTERVALS_STM_TO_SILVER AS
 SELECT
     UPPER(MATCH_ID) AS MATCH_ID,
-    -- PLAYER_ID 3210 --> PARTICIPANT_POS_ID = 1 // PLAYER_ID 3156 --> PARTICIPANT_POS_ID = 6
+    -- PLAYER_ID 3210 --> PARTICIPANT_POS_ID = 10 // PLAYER_ID 3156 --> PARTICIPANT_POS_ID = 6
     ((SAFECAST_TO_INT(PLAYER_ID) - 1) % 10) + 1 AS PARTICIPANT_POS_ID,
     -- Player 1-5 --> BLUE // Player 6-10 --> RED
     CASE

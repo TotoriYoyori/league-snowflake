@@ -1,6 +1,4 @@
 USE SCHEMA BRONZE;
-
-
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Player-level summary with load metadata
 -------------------------------------------------------------------------------------------
@@ -22,16 +20,12 @@ CREATE TABLE IF NOT EXISTS BRONZE.PLAYERS (
     CONSTRAINT BRONZE_PLAYERS_PKEY PRIMARY KEY (ID)
 )
 COMMENT = '[BRONZE] Raw player summary. Loaded via PLAYERS_PP from @PLAYERS_STG.';
-
-
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
 CREATE STREAM IF NOT EXISTS BRONZE.PLAYERS_STM
     ON TABLE BRONZE.PLAYERS
     COMMENT = 'PLAYERS delta --> BRONZE_TO_SILVER_PLAYERS_TASK --> SILVER.PLAYERS';
-
-
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for player summary CSVs
 -------------------------------------------------------------------------------------------
@@ -39,7 +33,6 @@ CREATE STAGE IF NOT EXISTS BRONZE.PLAYERS_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for player-level summary CSVs. Expected file: players_YYYYMMDD.csv';
-
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
@@ -63,8 +56,6 @@ FROM (
     FROM @BRONZE.PLAYERS_STG
 )
 ON_ERROR = 'SKIP_FILE_10%';
-
-
 -------------------------------------------------------------------------------------------
     -- 5. _PLAYERS_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
 -------------------------------------------------------------------------------------------

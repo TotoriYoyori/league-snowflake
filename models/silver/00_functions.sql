@@ -5,9 +5,9 @@ USE SCHEMA SILVER;
     -- HELPER UDF: Collection of reusable cleaning functions in the silver layer
 -------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION SILVER.VALID_NUM_RANGE(
-   NUM_VAL NUMBER,
-   NUM_MIN NUMBER,
-   NUM_MAX NUMBER
+    NUM_VAL NUMBER,
+    NUM_MIN NUMBER,
+    NUM_MAX NUMBER
 ) RETURNS NUMBER
 COMMENT = '[SILVER] Nullifies NUM_VAL when outside of valid [NUM_MIN, NUM_MAX] range'
 AS

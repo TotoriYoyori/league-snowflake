@@ -1,6 +1,4 @@
 USE SCHEMA BRONZE;
-
-
 -------------------------------------------------------------------------------------------
     -- 1. BRONZE TABLE: Match-level summary with load metadata
 -------------------------------------------------------------------------------------------
@@ -27,16 +25,12 @@ CREATE TABLE IF NOT EXISTS BRONZE.MATCHES (
     CONSTRAINT BRONZE_MATCHES_PKEY PRIMARY KEY (MATCH_ID)
 )
 COMMENT = '[BRONZE] Raw match summary. Loaded via MATCHES_PP from @MATCHES_STG.';
-
-
 -------------------------------------------------------------------------------------------
     -- 2. STREAM: CDC for silver consumption
 -------------------------------------------------------------------------------------------
 CREATE STREAM IF NOT EXISTS BRONZE.MATCHES_STM
     ON TABLE BRONZE.MATCHES
     COMMENT = 'BRONZE.MATCHES delta --> BRONZE_TO_SILVER_MATCHES_TASK --> SILVER.MATCHES';
-
-
 -------------------------------------------------------------------------------------------
     -- 3. STAGE: Internal stage for match summary CSVs
 -------------------------------------------------------------------------------------------
@@ -44,7 +38,6 @@ CREATE STAGE IF NOT EXISTS BRONZE.MATCHES_STG
     FILE_FORMAT = BRONZE.LEAGUE_CSV_FMT
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'Stage for match-level summary CSVs. Expected file: matches_YYYYMMDD.csv';
-    
 -------------------------------------------------------------------------------------------
     -- 4. PIPE: Ingest from stage into bronze table
 -------------------------------------------------------------------------------------------
@@ -73,8 +66,6 @@ FROM (
     FROM @BRONZE.MATCHES_STG
 )
 ON_ERROR = 'SKIP_FILE_10%';
-
-
 -------------------------------------------------------------------------------------------
     -- 5. _MATCHES_LOAD_ERRORS: audit view over this pipe's COPY_HISTORY.
 -------------------------------------------------------------------------------------------

@@ -47,8 +47,6 @@ EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/version
 
 -------------------------------------------------------------------------------------------
 -- 05. PATCHES: AD-HOC TO THE PIPELINE DURING DEVELOPMENTS
---     NOTE: 20260627_view_flag_missing_records.sql is intentionally not run here — it has
---     been promoted to models/bronze/06_unlogged_matches.sql (see BRONZE section above).
 -------------------------------------------------------------------------------------------
 EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/versions/live/patch/20260625_add_orphan_item_id_under_ref.sql';
 
