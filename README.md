@@ -42,16 +42,16 @@ https://github.com/user-attachments/assets/c3680031-7c95-44e1-8029-f626c2f202a4
 
 ```
 league-snowflake/
-├── assets/
-├── data_vault_ref/     # archived earlier modeling approach (reference only)
+├── assets/                   # images
+├── data_vault_ref/           # archived earlier modeling approach (reference only)
 ├── models/
-│   ├── _infra/         # DDL for schemas, seed tables, and simulated-load procedures
-│   ├── bronze/         # raw ingestion: tables, streams, stages, pipes
-│   ├── silver/         # cleaning views, tables, and merge tasks
-│   └── gold/           # dynamic tables + health_check.sql
-├── notebook/           # EDA and modelling notebooks
-├── patch/              # ad-hoc fixes applied to the live pipeline over time
-├── setup/              # all setup steps in order
+│   ├── _infra/               # DDL for schemas, seed tables, and simulated-load procedures
+│   ├── bronze/               # raw ingestion: tables, streams, stages, pipes
+│   ├── silver/               # cleaning views, tables, and merge tasks
+│   └── gold/                 # dynamic tables + health_check.sql
+├── notebook/                 # Demo notebooks for DS/ML workflows.
+├── patch/                    # ad-hoc fixes applied to the live pipeline over time
+├── setup/                    # all setup steps in order + teardown file.
 └── run_daily_ingestion.sql   # one-click: ingest the next simulated day
 ```
 

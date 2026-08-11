@@ -1,19 +1,7 @@
-# Install Guide
-
-You can get the full pipeline running in about 10 minutes.
-
-Let's go step by step.
-
----
-
 ## Prerequisites
 
-You need:
-
 * A **Snowflake account** with `ACCOUNTADMIN` role (a free trial works perfectly)
-* A **GitHub account** (just to download files, no push access needed)
 
-That's it. Everything else runs inside Snowflake.
 
 ---
 
@@ -25,23 +13,26 @@ In Snowsight:
 
 1. Click **Workspaces** (top-left nav)
 2. Click **+** → **Create new → Git Workspace**
-3. Paste the repository URL:
+3. In the resulting window, fill out the forms exactly as shown:
+   * Repository URL: `https://github.com/TotoriYoyori/league-snowflake`
+   * Workspace name: `league-snowflake`
+   
+![Create new workspace](../assets/setup/setup_00_create_workspace.png)
 
-```
-https://github.com/TotoriYoyori/league-snowflake
-```
-
-4. Under **API Integration**, click **+ API Integration** and create one:
+4. Click **+ API Integration** and fill out the form as followed, then hit **Create**.
    * Name: `GITHUB_TOTORI_YOYORI`
    * Allowed prefix: `https://github.com/TotoriYoyori/`
-5. Select **Public Repository**
-6. 👉 **Click Create**
+
+![Create new API integration](../assets/setup/setup_01_create_api_int.png)
+
+5. You will then go back to the previous screen to complete your workspace. Select the API integration `GITHUB_TOTORI_YOYORI`
+you just created (it should be auto-populated), select **Public Repository** and hit **Create**.
 
 > **Warning:** Keep the Workspace name exactly `league-snowflake` (Snowsight defaults to this from the repo URL,
 don't rename it!). Every `EXECUTE IMMEDIATE FROM 'snow://workspace/USER$.PUBLIC."league-snowflake"/...'` 
 call in `01_deploy.sql` depends on this name. See picture below for example of this name.
 
-![Git Workspace connected live to the league-snowflake GitHub repo](../assets/img/git_workspace.png)
+![Connect API to workspace and create](../assets/setup/setup_02_connect_api_to_workspace.png)
 
 You'll now see every file in the repo in your Workspace file tree.
 
@@ -51,19 +42,7 @@ any `.sql` file directly from the tree.
 ---
 ## 02. Deploy the Pipeline
 
-👉 **Open `setup/01_deploy.sql` from the file tree, then Run All.**
-
-```sql
--- That's it. One file deploys everything:
--- ✓ LEAGUE_RECORDS database
--- ✓ SEED, BRONZE, SILVER, GOLD schemas
--- ✓ Seed tables + upload stage
--- ✓ Bronze tables, streams, stages, pipes
--- ✓ Silver cleaning views, tables, tasks
--- ✓ Gold dynamic tables (self-refreshing, no task activation needed)
--- ✓ All patches applied
--- ✓ All stored procedures
-```
+Open `setup/01_deploy.sql` from the file tree, then hit **Run All** at the top left.
 
 ---
 
@@ -71,9 +50,9 @@ any `.sql` file directly from the tree.
 
 Go to the **GitHub releases** page:
 
-👉 **https://github.com/TotoriYoyori/league-snowflake/releases/tag/sample**
+**https://github.com/TotoriYoyori/league-snowflake/releases/tag/sample**
 
-👉 **Download these 5 files under Assets:**
+**Download these 5 files under Assets:**
 
 | File | Rows | Size |
 |------|------|------|
@@ -91,9 +70,9 @@ Now you'll put those files into Snowflake.
 
 In Snowsight, in the sidebar to the left, navigate to:
 
-**Catalog → Databases → LEAGUE_RECORDS → SEED → Stages → SEED_UPLOAD_STG**
+**Catalog → Databases → LEAGUE_RECORDS → SEED → Stages → UPLOAD_STG**
 
-👉 **Click + Files and upload all 5 files you just downloaded.**
+**Click + Files and upload all 5 files you just downloaded.**
 
 That's the only manual step. Everything after this is automated SQL.
 
@@ -107,35 +86,25 @@ the upload failed.
 ---
 ## 05. Load the Seed Data
 
-👉 **Open `setup/02_seed_source.sql` and Run All.**
+**Open `setup/02_seed_source.sql` and Run All.**
 
 Here's what happens under the hood:
 
-1. **Validation guard**: calls `SEED.VALIDATE_SEED_UPLOAD()` which checks the stage for all 5 required files. 
-If anything is missing, it stops with a clear error:
+1. **Validation guard**: calls `SEED.VALIDATE_SEED_UPLOAD()`, which checks the stage for all 5 required files.
+If anything is missing or duplicated, it halts the script with a Snowflake compilation error whose object name
+encodes exactly which files are missing (and any duplicates found) — e.g. an error mentioning
+`MISSING_FILES___INTERVALS__CHAMPIONS_REF___...`. That's expected behavior, not a bug: upload the missing file(s)
+and re-run.
 
-```
-Missing files in @SEED.SEED_UPLOAD_STG: intervals, champions_ref.
-Upload via Snowsight UI before running 02_seed_source.sql.
-```
-
-2. **COPY INTO**: loads each file into its seed table
-
-3. **Verify**: shows row counts:
-
-```
-SEED_MATCHES_SUMMARY    | 39,954
-SEED_PLAYERS_SUMMARY    | 399,540
-SEED_MATCH_INTERVALS    | 2,115,696
-SEED_ITEMS_REF          | 635
-SEED_CHAMPIONS_REF      | 173
-```
+2. **Load into seed tables**: `COPY INTO` for each of the 5 seed tables (`SEED.MATCHES`, `SEED.PLAYERS`,
+`SEED.INTERVALS`, `SEED.ITEMS_REF`, `SEED.CHAMPIONS_REF`) from the matching file on the stage.
 
 ![SEED schema populated with all 6 tables](../assets/img/seed_table.png)
 
-4. **Reference bootstrap**: The two small reference tables get loaded one time into their bronze table directly.
+3. **Reference bootstrap**: the two small reference tables (`items_ref`, `champions_ref`) get staged and loaded
+one time straight into their Bronze tables, since they don't go through the daily simulation.
 
-5. **Kickstart**: calls `SEED.SIMULATE_DAILY_LOAD()` once, staging the first simulated day's matches/players/intervals 
+4. **Kickstart**: calls `SEED.SIMULATE_DAILY_LOAD()` once, staging the first simulated day's matches/players/intervals 
 straight into Bronze. Tasks aren't active yet (next step), so this data just sits in the Bronze streams for now.
 
 > **Warning:** If the validation fails, don't skip it and run the COPY statements manually. Go back and upload the 
@@ -144,15 +113,15 @@ missing files first. The COPY INTO will succeed on empty stage paths without err
 ---
 ## 06. Activate the Tasks
 
-👉 **Open `setup/03_activate_tasks.sql` and Run All.**
+**Open `setup/03_activate_tasks.sql` and Run All.**
 
 This resumes all the tasks that move data from bronze → silver, since all tasks start suspended after first created.
 
 ```sql
 ALTER TASK SILVER.BRONZE_TO_SILVER_MATCHES_TASK RESUME;
 ALTER TASK SILVER.BRONZE_TO_SILVER_PLAYERS_TASK RESUME;
-ALTER TASK SILVER.BRONZE_TO_SILVER_ITEMS_TASK RESUME;
-ALTER TASK SILVER.BRONZE_TO_SILVER_CHAMPIONS_TASK RESUME;
+ALTER TASK SILVER.BRONZE_TO_SILVER_ITEMS_REF_TASK RESUME;
+ALTER TASK SILVER.BRONZE_TO_SILVER_CHAMPIONS_REF_TASK RESUME;
 ALTER TASK SILVER.BRONZE_TO_SILVER_INTERVALS_TASK RESUME;
 ```
 
@@ -166,7 +135,7 @@ the moment they're resumed. Give it a minute or two for the first scheduled run 
 ---
 ## 07. Deploy the Streamlit Apps
 
-👉 **Open `setup/04_create_streamlit_app.sql` and Run All**, same context as before (`ACCOUNTADMIN`, a warehouse selected).
+**Open `setup/04_create_streamlit_app.sql` and Run All**, same context as before (`ACCOUNTADMIN`, a warehouse selected).
 
 ### Find your apps
 In Snowsight, in the sidebar: **Projects → Streamlit**, or run:
@@ -196,7 +165,7 @@ Note that for this pipeline the **latest date is ingested first then going backw
 are sparse on older dates unfortunately, while more recent dates allows you to ingest more records, but the idea of daily simulation 
 is the same.
 
-### 👉 Whenever you want to ingest 'another day worth of data', open `run_daily_ingestion.sql` at the workspace root and click **Run All**.
+### Whenever you want to ingest 'another day worth of data', open `run_daily_ingestion.sql` at the workspace root and click **Run All**.
 
 That's the only file you need going forward.
 
@@ -211,14 +180,14 @@ Loaded date 2026-01-28. Advanced to 2026-01-27 (min: 2024-02-21)
 
 Run it again → next day loads. And again. Keep going as many days as you want.
 
-`SEED_LOAD_STATE` after several runs. `CURRENT_LOAD_DATE` visibly earlier than `MAX_DATE`, proof the simulation advances over repeated runs, not just once:
+`SEED.LOAD_STATE` after several runs. `CURRENT_LOAD_DATE` visibly earlier than `MAX_DATE`, proof the simulation advances over repeated runs, not just once:
 
-![SEED_LOAD_STATE table after several ingestion runs](../assets/img/simulated_history.png)
+![SEED.LOAD_STATE table after several ingestion runs](../assets/img/simulated_history.png)
 
 ## Check That It Works
 Give it 1-5 minutes for the pipeline to load data through each layer.
 
-👉 **Run this single query to verify data is flowing through every layer at once:**
+**Run this single query to verify data is flowing through every layer at once:**
 
 ```sql
 -- One grid: bronze landed it, silver cleaned it, gold aggregated it, seed tracks where we are.
@@ -227,50 +196,56 @@ FROM (
     SELECT 
         1 AS SEQ, 
         'BRONZE' AS LAYER, 
-        'MATCHES_SUMMARY_BRONZE' AS TABLE_NAME, 
+        'MATCHES' AS TABLE_NAME, 
         COUNT(*) AS ROW_COUNT, NULL AS DETAIL
-    FROM LEAGUE_RECORDS.BRONZE.MATCHES_SUMMARY_BRONZE
+    FROM LEAGUE_RECORDS.BRONZE.MATCHES
         UNION ALL
-    SELECT 2, 'BRONZE', 'PLAYERS_SUMMARY_BRONZE', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.BRONZE.PLAYERS_SUMMARY_BRONZE
+    SELECT 2, 'BRONZE', 'PLAYERS', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.BRONZE.PLAYERS
         UNION ALL
-    SELECT 3, 'BRONZE', 'MATCH_INTERVALS_BRONZE', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.BRONZE.MATCH_INTERVALS_BRONZE
+    SELECT 3, 'BRONZE', 'INTERVALS', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.BRONZE.INTERVALS
         UNION ALL
-    SELECT 4, 'SILVER', 'MATCHES_SUMMARY_SILVER', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.SILVER.MATCHES_SUMMARY_SILVER
+    SELECT 4, 'SILVER', 'MATCHES', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.SILVER.MATCHES
         UNION ALL
-    SELECT 5, 'SILVER', 'PLAYERS_SUMMARY_SILVER', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.SILVER.PLAYERS_SUMMARY_SILVER
+    SELECT 5, 'SILVER', 'PLAYERS', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.SILVER.PLAYERS
         UNION ALL
-    SELECT 6, 'SILVER', 'TEAM_INTERVAL_SILVER', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.SILVER.TEAM_INTERVAL_SILVER
+    SELECT 6, 'SILVER', 'INTERVALS', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.SILVER.INTERVALS
         UNION ALL
-    SELECT 7, 'SILVER', 'PLAYER_INTERVAL_SILVER', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.SILVER.PLAYER_INTERVAL_SILVER
-        UNION ALL
-    SELECT 8, 'GOLD', 'MATCHEND_PIVOT_TEAMSTATS', COUNT(*), NULL
+    SELECT 7, 'GOLD', 'MATCHEND_PIVOT_TEAMSTATS', COUNT(*), NULL
     FROM LEAGUE_RECORDS.GOLD.MATCHEND_PIVOT_TEAMSTATS
         UNION ALL
-    SELECT 9, 'GOLD', 'MATCHEND_PLAYER_STATS', COUNT(*), NULL
+    SELECT 8, 'GOLD', 'MATCHEND_PLAYER_STATS', COUNT(*), NULL
     FROM LEAGUE_RECORDS.GOLD.MATCHEND_PLAYER_STATS
         UNION ALL
-    SELECT 10, 'GOLD', 'DIFF_INTERVAL_STATE', COUNT(*), NULL
+    SELECT 9, 'GOLD', 'CHAMPION_INTERVALS', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.GOLD.CHAMPION_INTERVALS
+        UNION ALL
+    SELECT 10, 'GOLD', 'CHAMPION_OVERVIEWS', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.GOLD.CHAMPION_OVERVIEWS
+        UNION ALL
+    SELECT 11, 'GOLD', 'ITEM_RECOMMENDATIONS', COUNT(*), NULL
+    FROM LEAGUE_RECORDS.GOLD.ITEM_RECOMMENDATIONS
+        UNION ALL
+    SELECT 12, 'GOLD', 'DIFF_INTERVALS', COUNT(*), NULL
     FROM LEAGUE_RECORDS.GOLD.DIFF_INTERVALS
         UNION ALL
-    SELECT 11, 'SEED', 'SEED_LOAD_STATE', NULL,
+    SELECT 13, 'SEED', 'LOAD_STATE', NULL,
         'current=' || COALESCE(TO_VARCHAR(CURRENT_LOAD_DATE), '<null>')
         || '  min=' || COALESCE(TO_VARCHAR(MIN_DATE), '<null>')
         || '  max=' || COALESCE(TO_VARCHAR(MAX_DATE), '<null>')
         || '  last_loaded_at=' || COALESCE(TO_VARCHAR(LAST_LOADED_AT), '<null>')
-    FROM LEAGUE_RECORDS.SEED.SEED_LOAD_STATE
+    FROM LEAGUE_RECORDS.SEED.LOAD_STATE
 ) AS T
 ORDER BY SEQ;
 ```
 You should be seeing something like this, with perhaps different row count numbers from mine (since my version here
 has simulated daily ingestion by couple days ahead)
 
-![Check that it works — Bronze, Silver, Gold, and Seed row counts in one grid](assets/img/check_that_it_works.png)
+![Check that it works — Bronze, Silver, Gold, and Seed row counts in one grid](../assets/img/check_that_it_works.png)
 
 > **Tip:** If silver tables are empty but bronze has data, wait 1-2 minutes for the tasks to fire. You can check task history with:
 >
@@ -295,13 +270,3 @@ before opening a Streamlit app below), force a refresh instead of waiting by **r
 > ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.ITEM_RECOMMENDATIONS REFRESH;
 > ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.DIFF_INTERVALS REFRESH;
 > ```
-
-## Rebuilding Pipeline
-You can re-run `01_deploy.sql` through `04_create_streamlit_app.sql` in sequence to 
-rebuild everything from scratch at any time. 
-
-Note that `01_deploy.sql` starts with `CREATE OR REPLACE DATABASE`, which **drops all existing pipeline objects** 
-as well as **any current data stored within**. Unless you know what you are doing, or are looking to do a rebuild,
-I would stay away from `01_deploy.sql` beyond the first time you run it.
-
-You will have to reupload the seed .csv files to the stage after a rebuild if you want data back.
