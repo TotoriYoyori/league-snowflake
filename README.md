@@ -1,151 +1,104 @@
 ![League of Legends banner](assets/img/league_banner.jpg)
 
-# League of Legends ELT pipeline for 2.1 million in-game snapshots
-## Click here to set it up yourself → **[`setup/INSTALL_GUIDE.md`](setup/INSTALL_GUIDE.md)**
+# League of Legends SNOWFLAKE ELT Data Pipeline
 
-This project takes **39,954 real matches**, and runs it through a full medallion pipeline on Snowflake. 
-You can query the final tables, and even interact with them via Streamlit apps.
+**Continuously-running LoL analytics pipeline built entirely on Snowflake's free trial tier in under a month. 2.1 million time-series snapshots, incrementally ingested across ~700 simulated days, powering three live Streamlit apps.**
 
-The source data is hooked to a `simulate_daily_load` procedure so that users can slowly ingest the above 
-**2.1 millions** records over a period of ~700 days (make pretend daily data load!). Why did I bother with making this 
-simulated system? Because I want to prove that I can design a living pipeline that is built once but runs forever. 
-Designing a one-shot pipeline of course is much simpler.
+1. This project was built on a set of readily available .csv from Kaggle --> [*source*](https://www.kaggle.com/datasets/nathansmallcalder/league-of-legends-match-interval-snapshots-2026/data). The dataset itself was in turn sourced from [*Raw Community Dragon*](https://raw.communitydragon.org/).
 
+2. This project ingests the same raw data incrementally, simulating one day of real-world ingestion at a time, rather than a one-shot load. For a oneshot ETL version of this pipeline, built on Databricks, see [*here*](https://github.com/TotoriYoyori/league-databricks).
 
-Regardless, this pipeline is built to look and behave like a *real* production worthy pipeline: run now and forever. 
-Data arrives daily, cleans itself, aggregates itself, and refreshes on a schedule. Built entirely within the limit of 
-Snowflake's free trial credits, in **under a month of solo development**.
+> *"League of Legends SNOWFLAKE ELT Data Pipeline" was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.*
 
-----
-## The Streamlit Apps
+---
 
-This pipeline comes with the following three Streamlit apps. **All of which are capable of running either LIVE on Snowflake (using real data 
-produced by the pipeline), or just using mock data.**
+## Gallery
 
-You can click on each highlighted name below to visit their demo site on Streamlit Cloud! This demo version uses mock data, which is a
-sample of the real data that you would receive from the pipeline. 
+### 1. Orchestration
 
-1. **[Itemization Explorer](https://league-sf-item-browser.streamlit.app/)**: pick a champion and browse every item 
-by buy rate and win rate. Employ empirical-Bayes shrinkage for noisy low-n buy samples.
+https://github.com/user-attachments/assets/c3680031-7c95-44e1-8029-f626c2f202a4
+> *The pipeline and all its objects in the database tree.*
 
-https://github.com/user-attachments/assets/b4bfd5aa-1652-4e3f-8759-45b5abeab6c9
+![Gold dynamic table dependency graph](assets/img/gold_graph.png)
+> *Gold's dynamic table lineage and refresh lag example.*
 
-3. **[Role Importance](https://league-sf-role-importance.streamlit.app/)**: a logistic regression model that turns 
-each lane's gold diff at a chosen match minute into a win coefficient. Same model also powers a live predictor: 
-type in 5 gold diffs, get a win probability back.
+![SHOW DYNAMIC TABLES output with differentiated TARGET_LAG per Gold table](assets/img/gold_refreshness.png)
+> *Each Gold table refreshes on its own independent schedule.*
 
-https://github.com/user-attachments/assets/eb6cd0ef-abc9-4505-b540-1eff1882ee90
+### 2. Data Showcase
 
-4. **[Pipeline Monitor](https://league-sf-pipeline.streamlit.app/)**: a live dashboard for the pipeline itself: 
-27 checks across Seed, Bronze, Silver, and Gold. From ingestion progress, stream lag, task history, to Gold refresh 
-state, all in one place.
+![Check that it works — Bronze, Silver, Gold, and Seed row counts in one grid](assets/img/check_that_it_works.png)
+> *One query confirms data is flowing correctly through every layer at once.*
 
-https://github.com/user-attachments/assets/8df32ce6-13bb-42e8-b6f3-41875744a125
+![SEED schema populated with all 6 tables](assets/img/seed_table.png)
+> *Full historical dataset loaded once into SEED, ready to be simulated day-by-day into Bronze.*
 
-> **Info:** Each app runs two ways from the same code: 1. against the live warehouse inside Snowflake, or 2.
-fully offline against CSV exports for local development and demos.
+![health_check.sql output — 8 checks, including a real FAIL and REVIEW row](assets/img/health_check_result.png)
+> *Click-and-run data quality suite covering all 5 Gold tables.*
 
-----
-## Here's the whole pipeline:
+---
 
-* **Bronze → Silver → Gold** pipeline, built entirely on Snowflake.
-* Source data is fed in **one simulated day at a time**, just like a real source system.
-* **Bronze** lands it raw, **Silver** cleans it via streams + tasks, **Gold** aggregates it via dynamic tables.
-* On top of Gold sit **Streamlit apps** for exploring items, modeling win probability from gold diffs, and monitoring 
-the pipeline activites.
-* **Monitoring notebooks and health checks scripts** are also set up for your convenience.
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        LEAGUE_RECORDS DATABASE                       │
-├─────────────┬───────────────┬───────────────────┬───────────────────┤
-│    SEED     │    BRONZE     │      SILVER       │       GOLD        │
-│             │               │                   │                   │
-│ Source CSVs │ Raw landing   │ Cleaned/enriched  │ Aggregated        │
-│ loaded once │ via pipes     │ via stream+task   │ analytical tables │
-│             │ + metadata    │                   │ via dynamic tables│
-└─────────────┴───────────────┴───────────────────┴───────────────────┘
-```
+## Project Structure
 
 ```
 league-snowflake/
-├── assets/            
+├── assets/
 ├── data_vault_ref/     # archived earlier modeling approach (reference only)
 ├── models/
-│   ├── _infra/         # DDL for tables, views, pipes, etc. per folder under model.
-│   ├── bronze/        
-│   ├── gold/           
-│   └── silver/         
-├── notebook/                      
+│   ├── _infra/         # DDL for schemas, seed tables, and simulated-load procedures
+│   ├── bronze/         # raw ingestion: tables, streams, stages, pipes
+│   ├── silver/         # cleaning views, tables, and merge tasks
+│   └── gold/           # dynamic tables + health_check.sql
+├── notebook/           # EDA and modelling notebooks
 ├── patch/              # ad-hoc fixes applied to the live pipeline over time
-├── setup/   
+├── setup/              # all setup steps in order
 └── run_daily_ingestion.sql   # one-click: ingest the next simulated day
 ```
 
-This pipeline is for **internal development and analytics teams**, not casual lookups, and that changes what it offers
-relatively to a stats aggregator site like OP.gg.
+---
 
-* **Transparent statistics.** Every number is open source, you can read exactly how a win rate is computed instead of trusting a black box.
-* **Adjustable parameters.** Shrinkage strength, minimum sample size, time windows.
-* **Continuously ingesting.** Data flows in daily and Gold refreshes itself, with potential for NRT (near real time) loading.
-* **Honest about its limits.** Every row carries how stale it might be and how large its sample was. Teams can judge the data and make decisions.
+## Prerequisites to Deploy
 
-----
-## Showcase
+* A Snowflake account with the `ACCOUNTADMIN` role.
+* A running virtual warehouse (`COMPUTE_WH` by default).
 
-The pipeline and all its item in the database tree.
+> *Info: A free Snowflake trial account covers everything above. A couple of optional automation features (like external network access for auto-downloading seed files) are disabled by default on trial accounts, but neither is required to deploy or run this pipeline.*
 
-https://github.com/user-attachments/assets/c3680031-7c95-44e1-8029-f626c2f202a4
+---
 
-Gold's dynamic table lineage and refresh lag example.
+## How to Deploy Your Own Copy
 
-![Gold dynamic table dependency graph](assets/img/gold_graph.png)
+1. Run `setup/01_deploy.sql` to create the database and deploy `_infra` → bronze → silver → gold.
+2. Upload the 5 seed CSVs to `@SEED.UPLOAD_STG` via the Snowsight UI.
+3. Run `setup/02_seed_source.sql` to load the seed data and kickstart the first simulated day.
+4. Run `setup/03_activate_tasks.sql` to activate the bronze → silver tasks.
+5. Run `setup/04_create_streamlit_app.sql` to deploy the three Streamlit apps.
+6. From here on, run `run_daily_ingestion.sql` any time you want to ingest another simulated day.
 
-![SHOW DYNAMIC TABLES output with differentiated TARGET_LAG per Gold table](assets/img/gold_refreshness.png)
+Full walkthrough with screenshots --> **[`setup/INSTALL_GUIDE.md`](setup/INSTALL_GUIDE.md)**
 
-The pipeline has a click and run data quality suite as well!
+---
 
-![health_check.sql output — 8 checks, including a real FAIL and REVIEW row](assets/img/health_check_result.png)
+## The Streamlit Apps
 
-----
-## What can it answer?
+Three apps, each capable of running LIVE on Snowflake or fully offline against mock CSV exports.
 
-The Gold layer is designed around the questions an analyst (or a curious player) actually asks. 
-Each one maps to a table you can query directly:
+1. **[Itemization Explorer](https://league-sf-item-browser.streamlit.app/)**: pick a champion and browse every item by buy rate and win rate. Employ empirical-Bayes shrinkage for noisy low-n buy samples.
 
-| Question                                                      | Answered by |
-|---------------------------------------------------------------|-------------|
-| Does an early gold lead actually win games?                   | `MATCHEND_PIVOT_TEAMSTATS` |
-| Which objectives (dragons, barons, grubs) swing a match most? | `MATCHEND_PIVOT_TEAMSTATS` |
-| How does a champion grow over the course of a game?           | `CHAMPION_INTERVALS` |
-| What do different match-end player lineups looks like?        | `MATCHEND_PLAYER_STATS` |
-| Which champions and lanes dominate the meta?                  | `CHAMPION_OVERVIEWS` |
-| What should I build on champion *X*?                          | `ITEM_RECOMMENDATIONS` |
+https://github.com/user-attachments/assets/b4bfd5aa-1652-4e3f-8759-45b5abeab6c9
 
+2. **[Role Importance](https://league-sf-role-importance.streamlit.app/)**: a logistic regression model that turns each lane's gold diff at a chosen match minute into a win coefficient. Same model also powers a live predictor: type in 5 gold diffs, get a win probability back.
 
-----
-## Data sources
+https://github.com/user-attachments/assets/eb6cd0ef-abc9-4505-b540-1eff1882ee90
 
-Five source tables from the Kaggle dataset:
+3. **[Pipeline Monitor](https://league-sf-pipeline.streamlit.app/)**: a live dashboard for the pipeline itself: 27 checks across Seed, Bronze, Silver, and Gold. From ingestion progress, stream lag, task history, to Gold refresh state, all in one place.
 
-| Source | Grain | Rows |
-|--------|-------|------|
-| `matches_summary` | 1 per match | ~40K |
-| `players_summary` | 1 per player per match | ~400K |
-| `match_intervals` | 1 per player per minute | ~2.1M |
-| `items_ref` | 1 per item (lookup) | 635 |
-| `champions_ref` | 1 per champion (lookup) | 173 |
+https://github.com/user-attachments/assets/8df32ce6-13bb-42e8-b6f3-41875744a125
 
-Source: [LoL Match Intervals: 2 Million In-Game Snapshots](https://www.kaggle.com/datasets/nathansmallcalder/league-of-legends-match-interval-snapshots-2026)
+---
 
-----
-## Known limitations
+**Built with** --> Snowflake | SQL | Python (Streamlit)
 
-- **No run/data-snapshot tracking for the Streamlit apps:** Each of the app uses whatever data currently exists 
-at the moment it's run, but the output isn't currently logged or timestamped against the underlying data state. 
-This means results aren't directly comparable across runs over time (e.g., "did lane importance shift after the 
-role-quest patch?"). You have to eyeball and track things manually for now.
-- Has subtitles and descriptions in Chinese for all Streamlit apps, but no proper language setting button at the moment. 
-- **Warehouse Runtime outdated:** The Streamlit apps are currently deployed on Snowflake using WH runtime, which is the 
-legacy mode. Modern standard is using Container Runtime, but because I'm on a trial account I do not have access to
-external package dependencies.
+**Python Library Used** --> Streamlit | Pandas | And others...
+
+> *If you like my work and would like to discuss employment opportunities --> **email: stan.mng@gmail.com***.
