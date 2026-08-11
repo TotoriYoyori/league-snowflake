@@ -1,7 +1,7 @@
+# Install Guide
+
 ## Prerequisites
-
 * A **Snowflake account** with `ACCOUNTADMIN` role (a free trial works perfectly)
-
 
 ---
 
@@ -44,6 +44,8 @@ any `.sql` file directly from the tree.
 
 Open `setup/01_deploy.sql` from the file tree, then hit **Run All** at the top left.
 
+![Deploy all](../assets/setup/setup_03_deploy_all.png)
+
 ---
 
 ## 03. Download the Data
@@ -66,15 +68,13 @@ Go to the **GitHub releases** page:
 
 ## 04. Upload to the Seed Stage
 
-Now you'll put those files into Snowflake.
+1. In Snowsight, in the sidebar to the left, navigate to: **Catalog → Databases → LEAGUE_RECORDS → SEED → Stages → UPLOAD_STG**
 
-In Snowsight, in the sidebar to the left, navigate to:
+![Navigate to upload stage](../assets/setup/setup_04_find_upload_stg.png)
 
-**Catalog → Databases → LEAGUE_RECORDS → SEED → Stages → UPLOAD_STG**
+2. Click **+ Files** and upload all 5 files you just downloaded to **SEED.UPLOAD_STG**
 
-**Click + Files and upload all 5 files you just downloaded.**
-
-That's the only manual step. Everything after this is automated SQL.
+![Upload all 5 seed csv](../assets/setup/setup_05_upload_files.png)
 
 > **Tip:** The files can be in any order. The stage just needs to see these prefixes: `matches_summary`, 
 `players_summary`, `intervals`, `items_ref`, `champions_ref`.
@@ -86,65 +86,34 @@ the upload failed.
 ---
 ## 05. Load the Seed Data
 
-**Open `setup/02_seed_source.sql` and Run All.**
-
-Here's what happens under the hood:
-
-1. **Validation guard**: calls `SEED.VALIDATE_SEED_UPLOAD()`, which checks the stage for all 5 required files.
-If anything is missing or duplicated, it halts the script with a Snowflake compilation error whose object name
-encodes exactly which files are missing (and any duplicates found) — e.g. an error mentioning
-`MISSING_FILES___INTERVALS__CHAMPIONS_REF___...`. That's expected behavior, not a bug: upload the missing file(s)
-and re-run.
-
-2. **Load into seed tables**: `COPY INTO` for each of the 5 seed tables (`SEED.MATCHES`, `SEED.PLAYERS`,
-`SEED.INTERVALS`, `SEED.ITEMS_REF`, `SEED.CHAMPIONS_REF`) from the matching file on the stage.
-
-![SEED schema populated with all 6 tables](../assets/img/seed_table.png)
-
-3. **Reference bootstrap**: the two small reference tables (`items_ref`, `champions_ref`) get staged and loaded
-one time straight into their Bronze tables, since they don't go through the daily simulation.
-
-4. **Kickstart**: calls `SEED.SIMULATE_DAILY_LOAD()` once, staging the first simulated day's matches/players/intervals 
-straight into Bronze. Tasks aren't active yet (next step), so this data just sits in the Bronze streams for now.
+Open `setup/02_seed_source.sql` and **Run All.** 
 
 > **Warning:** If the validation fails, don't skip it and run the COPY statements manually. Go back and upload the 
 missing files first. The COPY INTO will succeed on empty stage paths without error. It'll just load zero rows silently.
 
+You will see a batch of ~700 matches will have been uploaded and ingested into the bronze tables.
+
+![Bronze pipe ingested](../assets/setup/setup_06_see_bronze.png)
+
 ---
 ## 06. Activate the Tasks
 
-**Open `setup/03_activate_tasks.sql` and Run All.**
-
-This resumes all the tasks that move data from bronze → silver, since all tasks start suspended after first created.
-
-```sql
-ALTER TASK SILVER.BRONZE_TO_SILVER_MATCHES_TASK RESUME;
-ALTER TASK SILVER.BRONZE_TO_SILVER_PLAYERS_TASK RESUME;
-ALTER TASK SILVER.BRONZE_TO_SILVER_ITEMS_REF_TASK RESUME;
-ALTER TASK SILVER.BRONZE_TO_SILVER_CHAMPIONS_REF_TASK RESUME;
-ALTER TASK SILVER.BRONZE_TO_SILVER_INTERVALS_TASK RESUME;
-```
+Open `setup/03_activate_tasks.sql` and **Run All.**
 
 Each task runs on a **1-minute schedule** and only fires when its bronze stream has new data. No data in the stream? 
 It skips, no cost accrued.
 
-> **Tip:** The previous step already staged one day of data into Bronze, so these tasks have real work waiting 
-the moment they're resumed. Give it a minute or two for the first scheduled run to actually fire, then head to 
-[Check That It Works](#check-that-it-works) below.
+> **Tip:** Give it a minute or two for the first scheduled run to actually fire, afterward you will see actual data in your table.
 
 ---
 ## 07. Deploy the Streamlit Apps
 
-**Open `setup/04_create_streamlit_app.sql` and Run All**, same context as before (`ACCOUNTADMIN`, a warehouse selected).
+Open `setup/04_create_streamlit_app.sql` and **Run All**.
 
 ### Find your apps
-In Snowsight, in the sidebar: **Projects → Streamlit**, or run:
+In Snowsight, in the sidebar: **Projects → Streamlit**. 
 
-```sql
-SHOW STREAMLITS IN DATABASE LEAGUE_RECORDS;
-```
-
-![All three Streamlit apps registered in Snowsight](../assets/img/streamlit_app_browse.png)
+![All three Streamlit apps](../assets/img/streamlit_app_browse.png)
 
 Click any app name to open it. Each opens against the `STREAMLIT_WH` warehouse created above.
 First load may take a few seconds for the warehouse to figure things out. Also note that **the pipeline needs
@@ -152,121 +121,45 @@ time to process new data**, so it might take up to 5 minutes before your app pic
 
 ----
 # How to Use
-This section covers the following:
-1. How to use the simulated daily ingestion system
-2. Verify that the pipeline is working
-3. How to rebuild the pipeline
 
 ## Simulate Daily Ingestion
 
+Whenever you want to ingest 'another day worth of data', open `run_daily_ingestion.sql` at the workspace root 
+and click **Run All**.
+
 The seed tables hold the *full* historical dataset. The `SIMULATE_DAILY_LOAD()` procedure stages **one day at a time**.
+This is my version of mock-pretend continuous data ingestion.
 
-Note that for this pipeline the **latest date is ingested first then going backward**. This is because the number of records
-are sparse on older dates unfortunately, while more recent dates allows you to ingest more records, but the idea of daily simulation 
-is the same.
+![Simulated loading results](../assets/setup/setup_07_simulate_result.png)
 
-### Whenever you want to ingest 'another day worth of data', open `run_daily_ingestion.sql` at the workspace root and click **Run All**.
-
-That's the only file you need going forward.
+You might notice that in this pipeline the **latest date is ingested first then going backward**. 
+This is because the number of records are sparse on older dates unfortunately...
 
 > **Info:** You will have already loaded one day back in [Load the Seed Data](#05-load-the-seed-data)!
 
-Output:
-```
-Loaded date 2026-01-28. Advanced to 2026-01-27 (min: 2024-02-21)
-```
+## Don't See Any Data?
 
-![run_daily_ingestion.sql output showing the loaded date and next date](../assets/img/success_simulated_load.png)
-
-Run it again → next day loads. And again. Keep going as many days as you want.
-
-`SEED.LOAD_STATE` after several runs. `CURRENT_LOAD_DATE` visibly earlier than `MAX_DATE`, proof the simulation advances over repeated runs, not just once:
-
-![SEED.LOAD_STATE table after several ingestion runs](../assets/img/simulated_history.png)
-
-## Check That It Works
-Give it 1-5 minutes for the pipeline to load data through each layer.
-
-**Run this single query to verify data is flowing through every layer at once:**
+If you don't see data in your silver layer immediately after refreshing the task, this is normal. 
+Give it 1-5 minutes for the task to pick up on new changes. You can check task history with:
 
 ```sql
--- One grid: bronze landed it, silver cleaned it, gold aggregated it, seed tracks where we are.
-SELECT LAYER, TABLE_NAME, ROW_COUNT, DETAIL
-FROM (
-    SELECT 
-        1 AS SEQ, 
-        'BRONZE' AS LAYER, 
-        'MATCHES' AS TABLE_NAME, 
-        COUNT(*) AS ROW_COUNT, NULL AS DETAIL
-    FROM LEAGUE_RECORDS.BRONZE.MATCHES
-        UNION ALL
-    SELECT 2, 'BRONZE', 'PLAYERS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.BRONZE.PLAYERS
-        UNION ALL
-    SELECT 3, 'BRONZE', 'INTERVALS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.BRONZE.INTERVALS
-        UNION ALL
-    SELECT 4, 'SILVER', 'MATCHES', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.SILVER.MATCHES
-        UNION ALL
-    SELECT 5, 'SILVER', 'PLAYERS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.SILVER.PLAYERS
-        UNION ALL
-    SELECT 6, 'SILVER', 'INTERVALS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.SILVER.INTERVALS
-        UNION ALL
-    SELECT 7, 'GOLD', 'MATCHEND_PIVOT_TEAMSTATS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.GOLD.MATCHEND_PIVOT_TEAMSTATS
-        UNION ALL
-    SELECT 8, 'GOLD', 'MATCHEND_PLAYER_STATS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.GOLD.MATCHEND_PLAYER_STATS
-        UNION ALL
-    SELECT 9, 'GOLD', 'CHAMPION_INTERVALS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.GOLD.CHAMPION_INTERVALS
-        UNION ALL
-    SELECT 10, 'GOLD', 'CHAMPION_OVERVIEWS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.GOLD.CHAMPION_OVERVIEWS
-        UNION ALL
-    SELECT 11, 'GOLD', 'ITEM_RECOMMENDATIONS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.GOLD.ITEM_RECOMMENDATIONS
-        UNION ALL
-    SELECT 12, 'GOLD', 'DIFF_INTERVALS', COUNT(*), NULL
-    FROM LEAGUE_RECORDS.GOLD.DIFF_INTERVALS
-        UNION ALL
-    SELECT 13, 'SEED', 'LOAD_STATE', NULL,
-        'current=' || COALESCE(TO_VARCHAR(CURRENT_LOAD_DATE), '<null>')
-        || '  min=' || COALESCE(TO_VARCHAR(MIN_DATE), '<null>')
-        || '  max=' || COALESCE(TO_VARCHAR(MAX_DATE), '<null>')
-        || '  last_loaded_at=' || COALESCE(TO_VARCHAR(LAST_LOADED_AT), '<null>')
-    FROM LEAGUE_RECORDS.SEED.LOAD_STATE
-) AS T
-ORDER BY SEQ;
+SELECT NAME, STATE, QUERY_START_TIME
+FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(
+    SCHEDULED_TIME_RANGE_START => DATEADD('hour', -1, CURRENT_TIMESTAMP())
+))
+ORDER BY QUERY_START_TIME DESC;
 ```
-You should be seeing something like this, with perhaps different row count numbers from mine (since my version here
-has simulated daily ingestion by couple days ahead)
 
-![Check that it works — Bronze, Silver, Gold, and Seed row counts in one grid](../assets/img/check_that_it_works.png)
+If you don't see data in your gold layer after a while, this is also normal. Gold tables are **dynamic tables**, not tasks. 
+They refresh on their own schedule (`TARGET_LAG`), not the moment new silver data lands. `GOLD.MATCHEND_PIVOT_TEAMSTATS` 
+is set to `TARGET_LAG = '1 day'`, so it can take up to a day to reflect a fresh load on its own. If you want to see current data 
+immediately (e.g. right before opening a Streamlit app below), force a refresh instead of waiting by **running the query block below.**
 
-> **Tip:** If silver tables are empty but bronze has data, wait 1-2 minutes for the tasks to fire. You can check task history with:
->
-> ```sql
-> SELECT NAME, STATE, QUERY_START_TIME
-> FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(
->     SCHEDULED_TIME_RANGE_START => DATEADD('hour', -1, CURRENT_TIMESTAMP())
-> ))
-> ORDER BY QUERY_START_TIME DESC;
-> ```
-
-> **Warning:** Gold tables are **dynamic tables**, not tasks. They refresh on their own schedule (`TARGET_LAG`), 
-not the moment new silver data lands. `GOLD.MATCHEND_PIVOT_TEAMSTATS` is set to `TARGET_LAG = '1 day'`, so it can 
-take up to a day to reflect a fresh load on its own. If you want to see current data immediately (e.g. right 
-before opening a Streamlit app below), force a refresh instead of waiting by **running the query block below.**
->
-> ```sql
-> ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.MATCHEND_PLAYER_STATS REFRESH;
-> ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.CHAMPION_INTERVALS REFRESH;
-> ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.CHAMPION_OVERVIEWS REFRESH;
-> ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.MATCHEND_PIVOT_TEAMSTATS REFRESH;
-> ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.ITEM_RECOMMENDATIONS REFRESH;
-> ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.DIFF_INTERVALS REFRESH;
-> ```
+```sql
+ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.MATCHEND_PLAYER_STATS REFRESH;
+ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.CHAMPION_INTERVALS REFRESH;
+ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.CHAMPION_OVERVIEWS REFRESH;
+ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.MATCHEND_PIVOT_TEAMSTATS REFRESH;
+ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.ITEM_RECOMMENDATIONS REFRESH;
+ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.DIFF_INTERVALS REFRESH;
+```
