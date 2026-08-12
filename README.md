@@ -1,43 +1,94 @@
-![League of Legends banner](assets/img/league_banner.jpg)
+![League of Legends banner](assets/readme/league_banner.jpg)
 
 # League of Legends SNOWFLAKE ELT Data Pipeline
 
-**Continuously-running LoL analytics pipeline built entirely on Snowflake's free trial tier in under a month. 2.1 million time-series snapshots, incrementally ingested across ~700 simulated days, powering three live Streamlit apps.**
+**Continuously-running LoL analytics pipeline built entirely on Snowflake's free trial tier.**
 
 1. This project was built on a set of readily available .csv from Kaggle --> [*source*](https://www.kaggle.com/datasets/nathansmallcalder/league-of-legends-match-interval-snapshots-2026/data). The dataset itself was in turn sourced from [*Raw Community Dragon*](https://raw.communitydragon.org/).
 
 2. This project ingests the same raw data incrementally, simulating one day of real-world ingestion at a time, rather than a one-shot load. For a oneshot ETL version of this pipeline, built on Databricks, see [*here*](https://github.com/TotoriYoyori/league-databricks).
 
+3. And yes, you can **[deploy your own copy](setup/INSTALL_GUIDE.md)** as well on Snowflake! 
+
+### Visit the following two Streamlit apps powered by the pipeline, both runnable as standalone demos and Snowflake live apps.
+* [Item Browser](https://github.com/TotoriYoyori/league-snowflake-item-browser): A simple champion/item browser
+* [Role Importance](https://github.com/TotoriYoyori/league-snowflake-role-importance): Simple logistic regression model 
+that predicts win rate from gold leads per lane.
+
 > *"League of Legends SNOWFLAKE ELT Data Pipeline" was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.*
 
 ---
-
 ## Gallery
 
-### 1. Orchestration
+### Orchestration
 
-https://github.com/user-attachments/assets/c3680031-7c95-44e1-8029-f626c2f202a4
-> *The pipeline and all its objects in the database tree.*
+![Silver lineage graph example](assets/readme/orc_01_silver_lineage.png)
 
-![Gold dynamic table dependency graph](assets/img/gold_graph.png)
-> *Gold's dynamic table lineage and refresh lag example.*
+> *Lineage graph of SILVER.PLAYERS. A stream is hooked up to BRONZE.PLAYERS, cleaned using a view DDL
+then inserted. The table is then used downstream for other GOLD tables.*
 
-![SHOW DYNAMIC TABLES output with differentiated TARGET_LAG per Gold table](assets/img/gold_refreshness.png)
-> *Each Gold table refreshes on its own independent schedule.*
+![Dynamic gold table summary](assets/readme/orc_02_gold_refresh.png)
 
-### 2. Data Showcase
+> *Each table listed in gold are the result of aggregating continuously incrementing data upstream. 
+Each are cleaned, reliable, refresh at their own cadence (target lag), and ready for end-user consumptions!*
 
-![Check that it works — Bronze, Silver, Gold, and Seed row counts in one grid](assets/img/check_that_it_works.png)
-> *One query confirms data is flowing correctly through every layer at once.*
+![Bronze pipe is live](assets/readme/orc_03_bronze_pipe.png)
 
-![SEED schema populated with all 6 tables](assets/img/seed_table.png)
-> *Full historical dataset loaded once into SEED, ready to be simulated day-by-day into Bronze.*
+> *The pipeline's SNOWPIPE are capable of ingesting continuous data from source .csv files.*
 
-![health_check.sql output — 8 checks, including a real FAIL and REVIEW row](assets/img/health_check_result.png)
-> *Click-and-run data quality suite covering all 5 Gold tables.*
+### Data Showcase
+
+![All layers row counts preview](assets/readme/data_01_show_rows.png)
+> *Data is flowing through every layer at once.*
+
+![Bronze stage hosting daily match file drop](assets/readme/data_02_bronze_stg.png)
+> *The stage is ready for daily file drop. I use a simple internal stage here for demoing purposes, but 
+in production, this can easily be swapped out for an external Cloud stage capable of auto-ingestion using event messages.*
+
+![Gold table data preview](assets/readme/data_03_gold_preview.png)
+> *Data preview of the gold table MATCHEND_PLAYER_STATS.*
+
+### Streamlit Apps (you can see more by visiting their individual repos)
+
+![]()
+
+> *Video showcase of the 'Role Importance' Streamlit app: deployed live on Snowflake, training from continuous data,
+making predictions for win probability based on different real life scenario of gold lead per lane! Built using 
+a simple Logistic Regression model.*
+
+![]()
+
+> *Video showcase of the 'Item Browser' Streamlit app: deployed live on Snowflake, aggregating from continuous data,
+allowing you to see what other players are building right now on your favorite champion, and even find out
+hidden gems / trap items.*
+
+### Monitoring & Health Checks
+
+![Bronze layer monitoring book](assets/readme/monitor_01_bronze_notebook.png)
+
+> *See how the pipeline is doing. At each layer, there is a monitor.ipynb notebook that user can simply run from top to 
+bottom to get a quick diagnosis glance.*
+
+![Gold layer health check script](assets/readme/monitor_02_gold_health.png)
+
+> *health_check.sql is a diagnosis script that you can run as often as you want.*
+
+### Notebook & Modelling
+
+![Finding a classifier model](assets/readme/notebook_01_clf_snoop.png)
+
+> *Sample notebook of a workflow where I would try to find the best classifier model for identifying player rank from 
+their matchend statistics. But it seems the models all underfit for now ...*
+
+![Hypothesis testing](assets/readme/notebook_02_hypo_title.png)
+
+![Hypothesis result](assets/readme/notebook_03_hypo_results.png)
+
+> *Another sample notebook where I tried to test if the feature 'Feat of Strength' introduced in Season 15, then removed
+later in Season 16 had an impact toward game balance. Results showed that the feature amplified the early-game
+snowball effect, but only for a modest ~4% win rate diff.*
 
 ---
-
 ## Project Structure
 
 ```
@@ -56,49 +107,8 @@ league-snowflake/
 ```
 
 ---
+**Built with** --> Snowflake | SQL | Python | Hard work
 
-## Prerequisites to Deploy
-
-* A Snowflake account with the `ACCOUNTADMIN` role.
-* A running virtual warehouse (`COMPUTE_WH` by default).
-
-> *Info: A free Snowflake trial account covers everything above. A couple of optional automation features (like external network access for auto-downloading seed files) are disabled by default on trial accounts, but neither is required to deploy or run this pipeline.*
-
----
-
-## How to Deploy Your Own Copy
-
-1. Run `setup/01_deploy.sql` to create the database and deploy `_infra` → bronze → silver → gold.
-2. Upload the 5 seed CSVs to `@SEED.UPLOAD_STG` via the Snowsight UI.
-3. Run `setup/02_seed_source.sql` to load the seed data and kickstart the first simulated day.
-4. Run `setup/03_activate_tasks.sql` to activate the bronze → silver tasks.
-5. Run `setup/04_create_streamlit_app.sql` to deploy the three Streamlit apps.
-6. From here on, run `run_daily_ingestion.sql` any time you want to ingest another simulated day.
-
-Full walkthrough with screenshots --> **[`setup/INSTALL_GUIDE.md`](setup/INSTALL_GUIDE.md)**
-
----
-
-## The Streamlit Apps
-
-Three apps, each capable of running LIVE on Snowflake or fully offline against mock CSV exports.
-
-1. **[Itemization Explorer](https://league-sf-item-browser.streamlit.app/)**: pick a champion and browse every item by buy rate and win rate. Employ empirical-Bayes shrinkage for noisy low-n buy samples.
-
-https://github.com/user-attachments/assets/b4bfd5aa-1652-4e3f-8759-45b5abeab6c9
-
-2. **[Role Importance](https://league-sf-role-importance.streamlit.app/)**: a logistic regression model that turns each lane's gold diff at a chosen match minute into a win coefficient. Same model also powers a live predictor: type in 5 gold diffs, get a win probability back.
-
-https://github.com/user-attachments/assets/eb6cd0ef-abc9-4505-b540-1eff1882ee90
-
-3. **[Pipeline Monitor](https://league-sf-pipeline.streamlit.app/)**: a live dashboard for the pipeline itself: 27 checks across Seed, Bronze, Silver, and Gold. From ingestion progress, stream lag, task history, to Gold refresh state, all in one place.
-
-https://github.com/user-attachments/assets/8df32ce6-13bb-42e8-b6f3-41875744a125
-
----
-
-**Built with** --> Snowflake | SQL | Python (Streamlit)
-
-**Python Library Used** --> Streamlit | Pandas | And others...
+**Python Library Used** --> Streamlit | Pandas | NumPy | Matplotlib | Seaborn | Sklearn | Statsmodel | And others ...
 
 > *If you like my work and would like to discuss employment opportunities --> **email: stan.mng@gmail.com***.
