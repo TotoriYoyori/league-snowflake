@@ -113,7 +113,7 @@ Open `setup/04_create_streamlit_app.sql` and **Run All**.
 ### Find your apps
 In Snowsight, in the sidebar: **Projects → Streamlit**. 
 
-![All three Streamlit apps](../assets/img/streamlit_app_browse.png)
+![All Streamlit apps](../assets/setup/setup_09_streamlit.png)
 
 Click any app name to open it. Each opens against the `STREAMLIT_WH` warehouse created above.
 First load may take a few seconds for the warehouse to figure things out. Also note that **the pipeline needs
@@ -163,3 +163,11 @@ ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.MATCHEND_PIVOT_TEAMSTATS REFRESH;
 ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.ITEM_RECOMMENDATIONS REFRESH;
 ALTER DYNAMIC TABLE LEAGUE_RECORDS.GOLD.DIFF_INTERVALS REFRESH;
 ```
+
+## Uninstall the pipeline
+Open `setup/_teardown.sql` and **Run All**.
+
+If you also want to remove the workspace itself, find the **...** in the top left next to the name of league-snowflake
+workspace, and **Delete**.
+
+![Delete the workspace](../assets/setup/setup_08_uninstall.png)
