@@ -50,13 +50,13 @@ in production, this can easily be swapped out for an external Cloud stage capabl
 
 ### Streamlit Apps (you can see more by visiting their individual repos)
 
-![]()
+https://github.com/user-attachments/assets/bec8d85d-05b3-4950-942e-661b332abc89
 
 > *Video showcase of the 'Role Importance' Streamlit app: deployed live on Snowflake, training from continuous data,
 making predictions for win probability based on different real life scenario of gold lead per lane! Built using 
 a simple Logistic Regression model.*
 
-![]()
+https://github.com/user-attachments/assets/afc52ffc-011c-4f14-930e-afe003bc4825
 
 > *Video showcase of the 'Item Browser' Streamlit app: deployed live on Snowflake, aggregating from continuous data,
 allowing you to see what other players are building right now on your favorite champion, and even find out
