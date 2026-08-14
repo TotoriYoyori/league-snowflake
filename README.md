@@ -107,6 +107,56 @@ league-snowflake/
 ```
 
 ---
+## Portfolio Reflection
+Here I give a brief post-mortem of the development of this project ~~that I cooked up for fun~~.
+
+### The initial problem
+There wasn't one, honestly. I found a Kaggle dataset: 5 CSVs, 2.1 million rows, League of Legends match data, 
+and thought: I could build a real ETL pipeline out of this. I love video games, I always wanted to work in games, 
+and I am good at data stuff, so this was a fun exercise.
+
+### Initial thinking
+I wanted to do "classical" ETL with Python/Apache, and then upload to Snowflake, but that tooling is Linux-only, so I 
+decided to just do everything on Snowflake instead. This flips the order into ELT. I also modeled it as a Data Vault 
+at first, mostly because I wanted to learn Data Vault.
+
+### Challenges, solutions, and what I learned.
+1. **Data Vault wasn't a good fit.** It is built for integrating multiple, continuously-updating sources. 
+League match logs are all append-only, so I ended up hashing keys nobody would ever join on for example. Around the 
+same time I was building the "honest, what I'd actually do" version of this pipeline on Databricks **(one-shot instead 
+of masquerading through simulated daily loads)** and it just used medallion architecture. Seeing how much simpler that 
+was helped convinced me to switch from Data Vault to a medallion architecture. 
+
+![Code snippet for data vault hashing](assets/readme/reflect_01_dv.png)
+
+2. **Originally I also wanted to normalize or partition** the intervals table (`SILVER.INTERVALS`) into individual grains
+because at source it was a ~36 column wide table. I tried modeling it as team-level intervals plus player-level intervals.
+But that introduced unneeded complexity for a table that wouldn't be queried anyway (only ever used to make gold tables).
+I tried a single-wide version on Databricks (ingesting the whole 36 columns as is) and it was much easier. So I kept it.
+
+![Code snippet for intervals partition attempt](assets/readme/reflect_02_partition.png)
+
+3. Making this reproducible was its own challenge. I dropped an **auto-ingesting cloud-stage design** because I can't 
+make people spin up their own cloud account, and **cut a planned third Streamlit app for pipeline monitoring** once 
+I realized it added nothing over the monitoring I already had (`monitor.ipynb` notebooks + `health_checks.sql`). 
+
+![Code snippet for azure integration](assets/readme/reflect_03_az.png)
+
+4. Then there's Fiddlesticks. Originally I wanted to prettify-format champion names **from PascalCase to Title Case**
+(because it would make it easier downstream for display, since that is how League client renders their name). I wrote 
+a function for it that broke on exactly one champion: Fiddlesticks, because the refs file and the player logs disagreed 
+on its internal capitalization. I tried to manually patch it with an update statement, but I thought it was pretty 
+silly to do so. I accepted that a database's job is to hold the truth, not prettify. I decided to uppercase all 
+champion names since that is the easier thing to do to integrate the two differing naming convention.
+
+![Query to reveal the Fiddlesticks naming difference between source](assets/readme/reflect_04_fiddlestick.png)
+
+5. Building the Databricks twin also taught me something less flattering about Snowflake: it's genuinely weak for
+engineering work: no native SCD Type 2, cleaning logic is SQL-only, and the free trial's blocked external access made
+seeding and deployment harder than it needed to be. Snowflake just queries faster once the data's already sitting there. 
+If I hit this exact problem with real stakeholders tomorrow, I'd engineer in Databricks, and analyze in Snowflake.
+
+---
 **Built with** --> Snowflake | SQL | Python | Hard work
 
 **Python Library Used** --> Streamlit | Pandas | NumPy | Matplotlib | Seaborn | Sklearn | Statsmodel | And others ...
