@@ -4,9 +4,11 @@
 
 **Continuously-running LoL analytics pipeline built entirely on Snowflake's free trial tier.**
 
-1. This project was built on a set of readily available .csv from Kaggle --> [*source*](https://www.kaggle.com/datasets/nathansmallcalder/league-of-legends-match-interval-snapshots-2026/data). The dataset itself was in turn sourced from [*Raw Community Dragon*](https://raw.communitydragon.org/).
+1. This project was built on a set of readily available .csv from Kaggle --> [*source*](https://www.kaggle.com/datasets/nathansmallcalder/league-of-legends-match-interval-snapshots-2026/data). The dataset itself was 
+in turn sourced from [*Raw Community Dragon*](https://raw.communitydragon.org/).
 
-2. This project ingests the same raw data incrementally, simulating one day of real-world ingestion at a time, rather than a one-shot load. For a oneshot ETL version of this pipeline, built on Databricks, see [*here*](https://github.com/TotoriYoyori/league-databricks).
+2. This project ingests the same raw data incrementally, simulating one day of real-world ingestion at a time, 
+rather than a one-shot load. For a oneshot version of this pipeline, built on Databricks, see [*here*](https://github.com/TotoriYoyori/league-databricks).
 
 3. And yes, you can **[deploy your own copy](setup/INSTALL_GUIDE.md)** as well on Snowflake! 
 
@@ -112,7 +114,7 @@ Here I give a brief post-mortem of the development of this project ~~that I cook
 
 ### The initial problem
 There wasn't one, honestly. I found a Kaggle dataset: 5 CSVs, 2.1 million rows, League of Legends match data, 
-and thought: I could build a real ETL pipeline out of this. I love video games, I always wanted to work in games, 
+and thought: I could build a real data pipeline out of this. I love video games, I always wanted to work in games, 
 and I am good at data stuff, so this was a fun exercise.
 
 ### Initial thinking
